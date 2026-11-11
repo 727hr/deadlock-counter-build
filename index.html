@@ -176,6 +176,25 @@
   button.vs.current { border-color: var(--gold); }
   .vs .rank { font: 700 13px var(--cond); color: var(--gold); width: 16px; text-align: center; }
 
+  /* ---------- stan meczu: kupione itemy, nakarmieni wrogowie, umiejętności ---------- */
+  .tile.owned { opacity: .42; filter: saturate(.35); }
+  .tile.owned .num { background: var(--good); color: #10200a; border-color: var(--good); }
+  .tile.next { box-shadow: 0 0 0 3px var(--gold), 0 0 22px -2px rgba(232,185,100,.8); }
+  .tile .flag.buy { background: var(--gold); color: #1b1408; }
+  .vs.fed { border-color: var(--enemy); box-shadow: inset 0 0 0 1px var(--enemy); }
+  .vs .fedtag { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; background: var(--enemy); color: #fff;
+    font: 700 10px var(--cond); letter-spacing: .5px; vertical-align: 1px; }
+  .vs .souls { color: var(--souls); }
+  .abils { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 6px; }
+  .abil { display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 5px 12px 5px 5px; }
+  .abil img { width: 40px; height: 40px; border-radius: 8px; background: #2b2540; padding: 4px; }
+  .abil b { font: 700 13px var(--cond); color: var(--gold); display: block; letter-spacing: .5px; }
+  .abil span { font: 600 15px var(--cond); }
+  .abils .arrow { width: 7px; height: 7px; border-top: 2px solid var(--gold-dim); border-right: 2px solid var(--gold-dim); transform: rotate(45deg); margin: 0 4px 0 0; }
+  .why-note { grid-column: 1 / -1; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 7px; margin-top: -4px; }
+  body.overlay .why-note { font-size: 14px; }
+  body.overlay .abil span { font-size: 16px; }
+
   /* ---------- tryb nakładki w grze ---------- */
   /* Okno w grze jest wąskie (ok. 450–650 px), więc wszystko układa się w siatkach na całą szerokość. */
   body.overlay { background: var(--bg); font-size: 17px; }
@@ -270,7 +289,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
-let heroes = [], items = new Map();
+let heroes = [], items = new Map(), abilities = new Map();
 let slots = [null, null, null, null, null, null, null]; // [0] = ja, 1..6 = wrogowie
 let active = 0;
 let badge = '110';
@@ -278,6 +297,9 @@ let badge = '110';
 let overlayQuery = location.search || (String(window.name).startsWith('?overlay') ? window.name : '');
 const OVERLAY = new URLSearchParams(overlayQuery).has('overlay');
 let overlayAllies = [];
+// Stan meczu przekazywany przez moda: dusze wrogów, kupione itemy, konto gracza (do puli jego bohaterów).
+const live = { souls: new Map(), owned: null, acc: '', pool: null, poolLoading: false };
+const normName = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 if (OVERLAY) document.title = 'CB|boot';
 const statsCache = new Map(); // "hero|badge" -> dane
 
@@ -289,11 +311,12 @@ async function getJSON(url) {
 }
 
 async function loadAssets() {
-  const cached = store.get('dl-assets-v3');
+  const cached = store.get('dl-assets-v4');
   if (cached && Date.now() - cached.t < 6 * 3600e3) return cached;
-  const [h, it] = await Promise.all([
+  const [h, it, ab] = await Promise.all([
     getJSON(API + '/assets/heroes?only_active=true'),
     getJSON(API + '/assets/items/by-type/upgrade'),
+    getJSON(API + '/assets/items/by-type/ability').catch(() => []),
   ]);
   const data = {
     t: Date.now(),
@@ -302,10 +325,12 @@ async function loadAssets() {
       .map(x => ({ id: x.id, name: x.name, img: x.images?.icon_image_small_webp || x.images?.icon_hero_card_webp || '',
         card: x.images?.icon_hero_card_webp || '', bg: x.images?.background_image_webp || '' }))
       .sort((a, b) => a.name.localeCompare(b.name)),
+    abilities: ab.filter(x => x.name && (x.image_webp || x.image) && (x.ability_type === 'signature' || x.ability_type === 'ultimate'))
+      .map(x => ({ id: x.id, name: x.name, img: x.image_webp || x.image })),
     items: it.filter(x => x.shopable)
       .map(x => ({ id: x.id, name: x.name, img: x.shop_image_webp || x.image_webp || '', slot: x.item_slot_type, tier: x.item_tier, cost: x.cost })),
   };
-  store.set('dl-assets-v3', data);
+  store.set('dl-assets-v4', data);
   return data;
 }
 
@@ -441,6 +466,17 @@ async function refresh() {
       done();
     }).catch(() => { entry.longLoading = false; });
   }
+  if (!entry.abil && !entry.abilLoading) {
+    entry.abilLoading = true;
+    queued(`${API}/analytics/ability-order-stats?hero_id=${me}&min_matches=5` + (badge ? `&min_average_badge=${badge}` : '') +
+      (entry.since ? `&min_unix_timestamp=${entry.since}` : '')).then(d => { entry.abil = d; done(); }).catch(() => {});
+  }
+  if (live.acc && !live.pool && !live.poolLoading) {
+    live.poolLoading = true;
+    getJSON(`${API}/players/hero-stats?account_ids=${encodeURIComponent(live.acc)}`).then(d => {
+      live.pool = new Map(d.map(r => [r.hero_id, { m: r.matches_played, w: r.wins }])); done();
+    }).catch(() => { live.poolLoading = false; });
+  }
   for (const eid of slots.slice(1)) {
     const cur = entry.vs.get(eid);
     if (!eid || (cur && !cur.err)) continue; // mamy dane albo trwa pobieranie
@@ -473,14 +509,14 @@ function analyze(me, base, meta, vs, enemies, long) {
   const hero = meta.games.get(me);
   const G = Math.max(hero ? hero.m : 0, maxBase);
   const wr0 = hero && hero.m ? hero.w / hero.m : .5;
-  const en = [];
+  const en = [], weightOf = enemyWeights(enemies);
   for (const eid of enemies) {
     const data = vs.get(eid);
     if (!data || !data.rows) continue;
     const rows = new Map(data.rows.map(r => [r.item_id, r]));
     const mu = meta.vs.get(me + '|' + eid);
     const n = Math.max(mu ? mu.m : 0, ...data.rows.map(r => r.matches), 1);
-    en.push({ id: eid, n, rows, shift: mu && mu.m ? mu.w / mu.m - wr0 : null });
+    en.push({ id: eid, n, rows, shift: mu && mu.m ? mu.w / mu.m - wr0 : null, w: weightOf(eid), souls: live.souls.get(eid) || 0 });
   }
   const rows = [];
   for (const r of base) {
@@ -494,8 +530,8 @@ function analyze(me, base, meta, vs, enemies, long) {
       const diff = pE - p0;
       const z = diff / Math.sqrt(Math.max(p0 * (1 - p0), .01) / e.n);
       if (Math.abs(z) < 2 || Math.abs(diff) < .02) continue;
-      adj += diff * e.n / (e.n + 150);
-      if (z > 0) up += z; else down += z;
+      adj += diff * e.w * e.n / (e.n + 150); // nakarmiony wróg liczy się mocniej
+      if (z > 0) up += z * e.w; else down += z * e.w;
       vsList.push({ id: e.id, p0, pE, z });
     }
     vsList.sort((a, b) => b.z - a.z);
@@ -524,11 +560,62 @@ const pp = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + ' pp';
 const pct = v => Math.round(v * 100) + '%';
 const num = v => (v ?? 0).toLocaleString('pl-PL');
 
+// Dusze z górnego paska gry przychodzą jako tekst ("12.4k", "1,234").
+function parseSouls(s) {
+  s = String(s || '').trim().toLowerCase();
+  const k = s.endsWith('k');
+  const v = parseFloat(k ? s.replace(',', '.') : s.replace(/[^0-9]/g, ''));
+  return isFinite(v) ? Math.round(k ? v * 1000 : v) : 0;
+}
+const fmtSouls = v => v >= 1000 ? (v / 1000).toFixed(1).replace('.', ',') + 'k' : String(v);
+
+// Waga wroga według jego dusz względem średniej drużyny: nakarmiony liczy się do 2×, biedny od 0,5×.
+// Działa dopiero, gdy średnia przekroczy 3000 dusz — wcześniej różnice nic nie znaczą.
+function enemyWeights(enemies) {
+  const vals = enemies.map(id => live.souls.get(id) || 0).filter(v => v > 0);
+  const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  return id => { const s = live.souls.get(id) || 0; return avg >= 3000 && s > 0 ? Math.min(2, Math.max(.5, s / avg)) : 1; };
+}
+
+const isOwned = it => !!live.owned && live.owned.has(normName(it.name));
+let nextStep = 0; // numer pierwszego niekupionego itemu w kolejności (0 = nie wiemy, co gracz ma)
+
+// Do czego służy item — krótkie uzasadnienie przy kontrach. Tylko itemy o jasnej, obronnej lub kontrującej roli.
+const WHY = {
+  healbane: 'Ogranicza leczenie wrogów, których trafiasz.',
+  toxicbullets: 'Pociski nakładają krwawienie i osłabiają leczenie celu.',
+  decay: 'Osłabia leczenie celu i zadaje obrażenia od jego zdrowia.',
+  metalskin: 'Na kilka sekund chroni przed pociskami.',
+  returnfire: 'Odbija część obrażeń od pocisków w atakującego.',
+  platedarmor: 'Zmniejsza obrażenia od pocisków.',
+  weaponshielding: 'Tarcza i odporność po otrzymaniu obrażeń od broni.',
+  spiritshielding: 'Tarcza i odporność po otrzymaniu obrażeń spirit.',
+  spiritresilience: 'Zmniejsza obrażenia spirit.',
+  reactivebarrier: 'Daje tarczę, gdy zostaniesz unieruchomiony lub ogłuszony.',
+  debuffreducer: 'Skraca efekty kontroli nakładane na ciebie.',
+  dispelmagic: 'Zdejmuje z ciebie negatywne efekty.',
+  unstoppable: 'Na chwilę uodparnia na ogłuszenia i inne efekty kontroli.',
+  counterspell: 'Blokuje wymierzoną w ciebie umiejętność wroga.',
+  knockdown: 'Ogłusza cel z opóźnieniem i strąca latających bohaterów.',
+  slowinghex: 'Spowalnia cel i blokuje jego umiejętności ruchu.',
+  disarminghex: 'Rozbraja cel, więc nie może strzelać.',
+  cursedrelic: 'Ucisza i rozbraja cel oraz blokuje jego itemy.',
+  etherealshift: 'Chwilowa nietykalność, żeby przeczekać burst.',
+  warpstone: 'Krótki teleport do ucieczki lub pościgu.',
+  inhibitor: 'Trafiony wróg zadaje mniej obrażeń.',
+  suppressor: 'Trafiony wróg strzela wolniej.',
+  tankbuster: 'Obrażenia od procentu zdrowia — na wytrzymałych wrogów.',
+  bulletresistshredder: 'Obniża odporność celu na pociski.',
+  mysticvulnerability: 'Obniża odporność celu na spirit.',
+  armorpiercingrounds: 'Pociski ignorują część odporności celu.',
+};
+
 function itemTile(r, step) {
-  const it = r.it, boosted = r.up > 0;
+  const it = r.it, boosted = r.up > 0, owned = isOwned(it), next = step && step === nextStep;
   const tip = `${it.name} — ${num(it.cost)} dusz, kupowany w ${pct(r.p)} ${r.late ? 'gier trwających ponad 35 minut' : 'gier'}, WR ${(r.wr * 100).toFixed(1)}%, zwykle ok. ${Math.round(r.t / 60)}. minuty`;
-  return `<div class="tile ${esc(it.slot)}${boosted ? ' boosted' : ''}" title="${esc(tip)}">` +
-    (step ? `<span class="num">${step}</span>` : '') + (boosted && step ? '<span class="flag">KONTRA</span>' : '') +
+  return `<div class="tile ${esc(it.slot)}${boosted ? ' boosted' : ''}${owned ? ' owned' : ''}${next ? ' next' : ''}" title="${esc(tip)}">` +
+    (step ? `<span class="num">${owned ? '✓' : step}</span>` : '') +
+    (next ? '<span class="flag buy">KUP</span>' : boosted && step && !owned ? '<span class="flag">KONTRA</span>' : '') +
     `<div class="art">${it.img ? `<img src="${esc(it.img)}" alt="" loading="lazy">` : ''}</div>` +
     `<div class="plate">${esc(it.name)}</div><div class="rate"><i style="width:${Math.round(r.p * 100)}%"></i></div>` +
     `<div class="foot"><span class="cost">${num(it.cost)}</span><span class="pct">${pct(r.p)}</span></div></div>`;
@@ -544,7 +631,24 @@ function counterCard(r, mode) {
       `<div class="top"><span>vs ${esc(h.name)}</span><span>${pct(v.p0)} → ${pct(v.pE)}</span></div>` +
       `<div class="meter"><i class="${down ? 'from' : 'to'}" style="width:${hi}%"></i><i class="${down ? 'to' : 'from'}" style="width:${lo}%"></i></div></div></div>`;
   }).join('');
-  return `<div class="ccard">${itemTile(r, 0)}<div class="reasons">${reasons}</div></div>`;
+  const why = !down && WHY[normName(r.it.name)];
+  return `<div class="ccard">${itemTile(r, 0)}<div class="reasons">${reasons}</div>${why ? `<div class="why-note">${esc(why)}</div>` : ''}</div>`;
+}
+
+// Kolejność maksowania umiejętności z najczęstszej sekwencji ulepszeń graczy.
+function abilityBlock(entry) {
+  if (!entry.abil || !entry.abil.length || !abilities.size) return '';
+  const total = entry.abil.reduce((s, r) => s + r.matches, 0);
+  const top = entry.abil.reduce((a, b) => b.matches > a.matches ? b : a);
+  const seq = top.abilities || [], ids = [...new Set(seq)];
+  if (ids.length < 3 || ids.some(id => !abilities.has(id))) return '';
+  // Umiejętność jest "zmaksowana" przy swoim ostatnim punkcie; kto kończy wcześniej, ten jest maksowany pierwszy.
+  const count = id => seq.filter(x => x === id).length, last = id => seq.lastIndexOf(id);
+  const order = ids.slice().sort((a, b) => count(b) - count(a) || last(a) - last(b));
+  return '<div class="block"><div class="label">Umiejętności</div><div class="abils">' + order.map((id, i) => {
+    const ab = abilities.get(id);
+    return (i ? '<i class="arrow"></i>' : '') + `<div class="abil"><img src="${esc(ab.img)}" alt=""><div><b>${i === 0 ? 'MAKSUJ NAJPIERW' : (i + 1) + '.'}</b><span>${esc(ab.name)}</span></div></div>`;
+  }).join('') + `</div><p class="hint" style="margin-top:8px">Najczęstsza kolejność ulepszeń (${pct(top.matches / total)} gier, winrate ${(top.wins / top.matches * 100).toFixed(1)}%).</p></div>`;
 }
 
 // Który bohater statystycznie najlepiej wypada przeciwko temu składowi (z winrate'ów bohater kontra bohater).
@@ -609,24 +713,39 @@ function renderResult(entry) {
   if (!enemies.length) html += '<p class="note">To build ogólny. Dodaj przeciwników po lewej, żeby dopasować go do meczu.</p>';
 
   if (a.en.length) {
-    html += '<div class="block"><div class="label">Przeciwnicy</div><div class="versus">' + a.en.map(m => {
-      const h = heroById(m.id), v = m.shift === null ? null : m.shift * 100;
-      return `<div class="vs" title="O tyle częściej lub rzadziej wygrywasz, gdy ten bohater jest po stronie wroga">` +
-        (h ? `<img src="${esc(h.img)}" alt="">` : '') + `<div><div class="n">${esc(h ? h.name : m.id)}</div><div class="g">${num(m.n)} gier</div></div>` +
+    // Gdy znamy dusze, najgroźniejsi (najbogatsi) wrogowie idą na początek.
+    const shown = a.en.slice().sort((x, y) => y.souls - x.souls);
+    html += '<div class="block"><div class="label">Przeciwnicy</div><div class="versus">' + shown.map(m => {
+      const h = heroById(m.id), v = m.shift === null ? null : m.shift * 100, fed = m.w >= 1.25;
+      return `<div class="vs${fed ? ' fed' : ''}" title="O tyle częściej lub rzadziej wygrywasz, gdy ten bohater jest po stronie wroga">` +
+        (h ? `<img src="${esc(h.img)}" alt="">` : '') + `<div><div class="n">${esc(h ? h.name : m.id)}${fed ? '<span class="fedtag">NAKARMIONY</span>' : ''}</div>` +
+        `<div class="g">${m.souls ? `<span class="souls">${fmtSouls(m.souls)} dusz</span>` : num(m.n) + ' gier'}</div></div>` +
         (v === null ? '' : `<span class="d ${v >= 0 ? 'pos' : 'neg'}">${pp(v)}</span>`) + '</div>';
     }).join('') + '</div></div>';
   }
 
   if (enemies.length && entry.meta.vs.size) {
-    const picks = bestPicks(entry.meta, enemies), mine = picks.findIndex(x => x.h.id === me.id);
-    const pool = OVERLAY && overlayAllies.length ? null : picks.slice(0, 6);
-    const row = (x, i) => `<button class="vs${x.h.id === me.id ? ' current' : ''}" data-pick="${x.h.id}" title="Zwykle ${(x.base * 100).toFixed(1)}%, na ten skład ${(x.wr * 100).toFixed(1)}%">` +
-      `<span class="rank">${i + 1}</span><img src="${esc(x.h.img)}" alt=""><div><div class="n">${esc(x.h.name)}</div><div class="g">zwykle ${(x.base * 100).toFixed(1)}%</div></div>` +
-      `<span class="d ${x.wr >= x.base ? 'pos' : 'neg'}">${(x.wr * 100).toFixed(1)}%</span></button>`;
-    if (picks.length) html += '<div class="block"><div class="label">Najlepszy wybór na ten skład</div><div class="versus">' +
-      (pool || picks.slice(0, 6)).map(row).join('') + (mine >= 6 ? row(picks[mine], mine) : '') +
+    // Jeśli znamy konto gracza, podpowiadamy tylko bohaterów, którymi już grał (czyli na pewno ich ma).
+    const all = bestPicks(entry.meta, enemies);
+    const mineOnly = live.pool && live.pool.size ? all.filter(x => live.pool.has(x.h.id)) : null;
+    const picks = mineOnly && mineOnly.length ? mineOnly : all, mine = picks.findIndex(x => x.h.id === me.id);
+    const row = (x, i) => {
+      const own = live.pool && live.pool.get(x.h.id);
+      const sub = own ? `twoje: ${own.m} ${own.m === 1 ? 'gra' : 'gier'}, ${Math.round(own.w / own.m * 100)}%` : `zwykle ${(x.base * 100).toFixed(1)}%`;
+      return `<button class="vs${x.h.id === me.id ? ' current' : ''}" data-pick="${x.h.id}" title="Zwykle ${(x.base * 100).toFixed(1)}%, na ten skład ${(x.wr * 100).toFixed(1)}%">` +
+        `<span class="rank">${i + 1}</span><img src="${esc(x.h.img)}" alt=""><div><div class="n">${esc(x.h.name)}</div><div class="g">${sub}</div></div>` +
+        `<span class="d ${x.wr >= x.base ? 'pos' : 'neg'}">${(x.wr * 100).toFixed(1)}%</span></button>`;
+    };
+    if (picks.length) html += `<div class="block"><div class="label">${picks === mineOnly ? 'Twoi bohaterowie na ten skład' : 'Najlepszy wybór na ten skład'}</div><div class="versus">` +
+      picks.slice(0, 6).map(row).join('') + (mine >= 6 ? row(picks[mine], mine) : '') +
       '</div><p class="hint" style="margin-top:8px">Przewidywany winrate bohatera przeciwko tym wrogom w wybranej randze. Kliknij, żeby zobaczyć jego build.</p></div>';
   }
+
+  html += abilityBlock(entry);
+
+  // Pierwszy niekupiony item w kolejności dostaje znacznik "KUP" (tylko gdy mod podał, co gracz ma).
+  nextStep = 0;
+  if (live.owned) { let n = 0; for (const ph of a.phases) for (const r of ph) { n++; if (!nextStep && !isOwned(r.it)) nextStep = n; } }
 
   html += '<div class="block"><div class="label">Kolejność zakupów</div>' +
     '<div class="legend"><span>Kupuj od lewej do prawej.</span>' +
@@ -651,18 +770,31 @@ function renderResult(entry) {
 }
 
 // Ustawia skład z zapytania nakładki: me=, allies=, enemies= (angielskie nazwy bohaterów).
+// Parametry mogą być w zapytaniu (?…) albo po krzyżyku (#…). Mod zmienia tylko część po krzyżyku,
+// bo taka zmiana nie przeładowuje strony — tak dochodzi stan meczu na żywo.
 function applyOverlay() {
   const params = new URLSearchParams(overlayQuery);
-  const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
-  const find = n => heroes.find(h => norm(h.name) === norm(n))?.id ?? null;
-  const list = key => (params.get(key) || '').split(',').filter(Boolean).map(find).filter(Boolean);
+  for (const [k, v] of new URLSearchParams(location.hash.slice(1))) params.set(k, v);
+  const find = n => heroes.find(h => normName(h.name) === normName(n))?.id ?? null;
+  const names = key => (params.get(key) || '').split(',').filter(Boolean);
+  const list = key => names(key).map(find).filter(Boolean);
+  const enemyNames = names('enemies'), enemySouls = (params.get('es') || '').split(',');
   const enemies = list('enemies'); overlayAllies = list('allies');
+  live.souls = new Map();
+  enemyNames.forEach((n, i) => { const id = find(n), s = parseSouls(enemySouls[i]); if (id && s) live.souls.set(id, s); });
+  live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(normName)) : null;
+  const acc = (params.get('acc') || '').replace(/[^0-9]/g, '');
+  if (acc !== live.acc) { live.acc = acc; live.pool = null; live.poolLoading = false; }
   const remembered = store.get('dl-overlay-me');
   const mine = find(params.get('me') || '') ?? (overlayAllies.includes(remembered) ? remembered : null);
   slots = [mine, ...enemies.slice(0, 6)]; while (slots.length < 7) slots.push(null);
   // Tytuł strony to jedyne, co mod widzi z okna — służy do diagnostyki w logu gry.
-  document.title = `CB|loaded|me=${mine ?? '?'}|allies=${overlayAllies.length}|enemies=${enemies.length}|${Date.now() % 100000}`;
+  document.title = `CB|loaded|me=${mine ?? '?'}|allies=${overlayAllies.length}|enemies=${enemies.length}|souls=${live.souls.size}|own=${live.owned ? live.owned.size : '-'}|${Date.now() % 100000}`;
 }
+window.addEventListener('hashchange', () => {
+  if (!OVERLAY || !heroes.length) return;
+  applyOverlay(); renderPicker(); refresh();
+});
 // Mod woła to przy każdej zmianie składu.
 window.__cbUpdate = q => {
   overlayQuery = q;
@@ -674,6 +806,9 @@ window.__cbUpdate = q => {
   try {
     const a = await loadAssets();
     heroes = a.heroes; items = new Map(a.items.map(i => [i.id, i]));
+    abilities = new Map((a.abilities || []).map(x => [x.id, x]));
+    // Na zwykłej stronie konto można podać w adresie (?acc=…), żeby podpowiedź obejmowała tylko własnych bohaterów.
+    if (!OVERLAY) live.acc = (new URLSearchParams(location.search).get('acc') || '').replace(/[^0-9]/g, '');
     if (OVERLAY) {
       document.body.classList.add('overlay');
       applyOverlay();
