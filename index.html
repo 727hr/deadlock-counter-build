@@ -182,6 +182,8 @@
   .tile.next { box-shadow: 0 0 0 3px var(--gold), 0 0 22px -2px rgba(232,185,100,.8); }
   .tile .flag.buy { background: var(--gold); color: #1b1408; }
   .vs.fed { border-color: var(--enemy); box-shadow: inset 0 0 0 1px var(--enemy); }
+  .vs .lanetag { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; background: var(--gold); color: #1b1408;
+    font: 700 10px var(--cond); letter-spacing: .5px; vertical-align: 1px; }
   .vs .fedtag { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; background: var(--enemy); color: #fff;
     font: 700 10px var(--cond); letter-spacing: .5px; vertical-align: 1px; }
   .vs .souls { color: var(--souls); }
@@ -298,7 +300,7 @@ let overlayQuery = location.search || (String(window.name).startsWith('?overlay'
 const OVERLAY = new URLSearchParams(overlayQuery).has('overlay');
 let overlayAllies = [];
 // Stan meczu przekazywany przez moda: dusze wrogów, kupione itemy, konto gracza (do puli jego bohaterów).
-const live = { souls: new Map(), owned: null, acc: '', pool: null, poolLoading: false };
+const live = { souls: new Map(), owned: null, lane: new Set(), acc: '', pool: null, poolLoading: false };
 const normName = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 if (OVERLAY) document.title = 'CB|boot';
 const statsCache = new Map(); // "hero|badge" -> dane
@@ -311,7 +313,7 @@ async function getJSON(url) {
 }
 
 async function loadAssets() {
-  const cached = store.get('dl-assets-v4');
+  const cached = store.get('dl-assets-v5');
   if (cached && Date.now() - cached.t < 6 * 3600e3) return cached;
   const [h, it, ab] = await Promise.all([
     getJSON(API + '/assets/heroes?only_active=true'),
@@ -328,9 +330,9 @@ async function loadAssets() {
     abilities: ab.filter(x => x.name && (x.image_webp || x.image) && (x.ability_type === 'signature' || x.ability_type === 'ultimate'))
       .map(x => ({ id: x.id, name: x.name, img: x.image_webp || x.image })),
     items: it.filter(x => x.shopable)
-      .map(x => ({ id: x.id, name: x.name, img: x.shop_image_webp || x.image_webp || '', slot: x.item_slot_type, tier: x.item_tier, cost: x.cost })),
+      .map(x => ({ id: x.id, name: x.name, img: x.shop_image_webp || x.image_webp || '', slot: x.item_slot_type, tier: x.item_tier, cost: x.cost, cls: x.class_name, comps: x.component_items || [] })),
   };
-  store.set('dl-assets-v4', data);
+  store.set('dl-assets-v5', data);
   return data;
 }
 
@@ -524,7 +526,10 @@ function analyze(me, base, meta, vs, enemies, long) {
     if (!it) continue;
     const p0 = Math.min(1, r.matches / G);
     let adj = 0, up = 0, down = 0; const vsList = [];
+    // Itemy z fazy linii dobieramy tylko pod przeciwników z własnej linii, jeśli mod ich wskazał.
+    const early = r.avg_buy_time_s < PHASES[0].max;
     for (const e of en) {
+      if (early && live.lane.size && !live.lane.has(e.id)) continue;
       const er = e.rows.get(r.item_id);
       const pE = Math.min(1, (er ? er.matches : 0) / e.n);
       const diff = pE - p0;
@@ -562,7 +567,7 @@ const num = v => (v ?? 0).toLocaleString('pl-PL');
 
 // Dusze z górnego paska gry przychodzą jako tekst ("12.4k", "1,234").
 function parseSouls(s) {
-  s = String(s || '').trim().toLowerCase();
+  s = String(s || '').replace(/<[^>]*>/g, '').trim().toLowerCase(); // gra owija "k" w znacznik
   const k = s.endsWith('k');
   const v = parseFloat(k ? s.replace(',', '.') : s.replace(/[^0-9]/g, ''));
   return isFinite(v) ? Math.round(k ? v * 1000 : v) : 0;
@@ -718,7 +723,7 @@ function renderResult(entry) {
     html += '<div class="block"><div class="label">Przeciwnicy</div><div class="versus">' + shown.map(m => {
       const h = heroById(m.id), v = m.shift === null ? null : m.shift * 100, fed = m.w >= 1.25;
       return `<div class="vs${fed ? ' fed' : ''}" title="O tyle częściej lub rzadziej wygrywasz, gdy ten bohater jest po stronie wroga">` +
-        (h ? `<img src="${esc(h.img)}" alt="">` : '') + `<div><div class="n">${esc(h ? h.name : m.id)}${fed ? '<span class="fedtag">NAKARMIONY</span>' : ''}</div>` +
+        (h ? `<img src="${esc(h.img)}" alt="">` : '') + `<div><div class="n">${esc(h ? h.name : m.id)}${live.lane.has(m.id) ? '<span class="lanetag">LINIA</span>' : ''}${fed ? '<span class="fedtag">NAKARMIONY</span>' : ''}</div>` +
         `<div class="g">${m.souls ? `<span class="souls">${fmtSouls(m.souls)} dusz</span>` : num(m.n) + ' gier'}</div></div>` +
         (v === null ? '' : `<span class="d ${v >= 0 ? 'pos' : 'neg'}">${pp(v)}</span>`) + '</div>';
     }).join('') + '</div></div>';
@@ -756,7 +761,9 @@ function renderResult(entry) {
   PHASES.forEach((p, i) => {
     if (!a.phases[i].length) return;
     const sum = a.phases[i].reduce((s, r) => s + (r.it.cost || 0), 0);
-    html += `<div class="phase"><div class="phase-head"><b>${p.name}</b><span>${p.sub}</span><span class="sum">${num(sum)} dusz</span></div><div class="flow">` +
+    const laneNames = i === 0 ? enemies.filter(id => live.lane.has(id)).map(id => heroById(id)?.name).filter(Boolean) : [];
+    const sub = laneNames.length ? 'pod twoją linię: ' + laneNames.join(', ') : p.sub;
+    html += `<div class="phase"><div class="phase-head"><b>${p.name}</b><span>${esc(sub)}</span><span class="sum">${num(sum)} dusz</span></div><div class="flow">` +
       a.phases[i].map(r => itemTile(r, ++step)).join('') + '</div></div>';
   });
   html += '</div>';
@@ -783,13 +790,26 @@ function applyOverlay() {
   live.souls = new Map();
   enemyNames.forEach((n, i) => { const id = find(n), s = parseSouls(enemySouls[i]); if (id && s) live.souls.set(id, s); });
   live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(normName)) : null;
+  if (live.owned) {
+    // Kupiony ulepszony item zawiera swoje składniki — sklep nie pokazuje ich już jako posiadanych.
+    const byCls = new Map(), byName = new Map();
+    for (const it of items.values()) { byCls.set(it.cls, it); byName.set(normName(it.name), it); }
+    const stack = [...live.owned].map(n => byName.get(n)).filter(Boolean);
+    while (stack.length) {
+      for (const c of stack.pop().comps || []) {
+        const ci = byCls.get(c);
+        if (ci && !live.owned.has(normName(ci.name))) { live.owned.add(normName(ci.name)); stack.push(ci); }
+      }
+    }
+  }
+  live.lane = new Set(list('lane'));
   const acc = (params.get('acc') || '').replace(/[^0-9]/g, '');
   if (acc !== live.acc) { live.acc = acc; live.pool = null; live.poolLoading = false; }
   const remembered = store.get('dl-overlay-me');
   const mine = find(params.get('me') || '') ?? (overlayAllies.includes(remembered) ? remembered : null);
   slots = [mine, ...enemies.slice(0, 6)]; while (slots.length < 7) slots.push(null);
   // Tytuł strony to jedyne, co mod widzi z okna — służy do diagnostyki w logu gry.
-  document.title = `CB|loaded|me=${mine ?? '?'}|allies=${overlayAllies.length}|enemies=${enemies.length}|souls=${live.souls.size}|own=${live.owned ? live.owned.size : '-'}|${Date.now() % 100000}`;
+  document.title = `CB|loaded|me=${mine ?? '?'}|allies=${overlayAllies.length}|enemies=${enemies.length}|souls=${live.souls.size}|own=${live.owned ? live.owned.size : '-'}|lane=${live.lane.size}|${Date.now() % 100000}`;
 }
 window.addEventListener('hashchange', () => {
   if (!OVERLAY || !heroes.length) return;
