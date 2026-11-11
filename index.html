@@ -1059,7 +1059,7 @@ function publishList(a) {
     n++;
     if (isOwned(r.it) || skipWhenFull(r.it) || out.length >= 10) continue;
     const icon = (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
-    out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r), n === nextStep && sell ? sell.text : '']);
+    out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r), '']);
   }
   // Kontry spoza kolejności (np. sytuacyjne) też trafiają na listę, na końcu.
   for (const r of a.counters) {
@@ -1070,6 +1070,11 @@ function publishList(a) {
   if (tr && tr.dieOften && Date.now() - tr.at < 30 * 86400e3) {
     const di = out.findIndex((x, i) => i > 1 && DEFENSIVE.includes(normName(x[0])));
     if (di > 1) { const [d] = out.splice(di, 1); d[5] = 'You often die a lot on this hero (from your recent match summaries). ' + d[5]; out.splice(1, 0, d); }
+  }
+  // Pozycja "S" (sprzedaj) idzie na górę: nazwa, kategoria, zwrot (połowa ceny), ikona, powód.
+  if (sell) {
+    const icon = (sell.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
+    out.unshift([sell.it.name, (sell.it.slot || '')[0] || '', Math.round((sell.it.cost || 0) / 2), 'S', icon, sell.text + '.', '']);
   }
   const json = JSON.stringify(out);
   if (json === lastList) return;
