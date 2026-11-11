@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deadlock Counter-Build</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=Marcellus+SC&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b100f; --panel: #131b19; --panel2: #1a2522; --panel3: #22302c; --line: #2c3c37;
+    --text: #efe6d2; --muted: #93a39b; --gold: #e8b964; --gold-dim: #8a6d3a; --enemy: #e2604a;
+    --weapon: #c9801f; --weapon-plate: #f3dcb4; --vitality: #6f9d23; --vitality-plate: #dcebb6;
+    --spirit: #8d5cc0; --spirit-plate: #e2d0f3; --souls: #8fe6cd;
+    --good: #9ad862; --bad: #ee7b66;
+    --display: "Marcellus SC", Georgia, serif; --cond: "Barlow Condensed", "Barlow", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scrollbar-color: var(--line) var(--bg); }
+  body { margin: 0; color: var(--text); font: 15px/1.45 "Barlow", "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(1200px 600px at 75% -10%, #1d2b27 0%, transparent 60%),
+      radial-gradient(900px 500px at 0% 0%, #241c12 0%, transparent 55%), var(--bg);
+    background-attachment: fixed; min-height: 100vh; }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- nagłówek ---------- */
+  header { max-width: 1440px; margin: 0 auto; padding: 22px 24px 10px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+  .brand .mark { width: 38px; height: 38px; transform: rotate(45deg); border: 2px solid var(--gold); display: grid; place-items: center; margin: 0 6px; }
+  .brand .mark i { width: 16px; height: 16px; background: var(--gold); display: block; }
+  h1 { font: 400 28px/1 var(--display); letter-spacing: 2px; margin: 0; color: var(--text); }
+  h1 em { font-style: normal; color: var(--gold); }
+  .brand p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+  .ranks { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+  .ranks button { background: none; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; color: var(--muted);
+    font: 600 14px var(--cond); letter-spacing: .6px; text-transform: uppercase; }
+  .ranks button:hover { color: var(--text); }
+  .ranks button.on { background: var(--gold); color: #1b1408; }
+
+  main { max-width: 1440px; margin: 0 auto; padding: 10px 24px 40px; display: grid;
+    grid-template-columns: 372px minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; padding: 10px 16px 40px; } header { padding: 18px 16px 8px; } }
+  .panel { background: linear-gradient(180deg, var(--panel) 0%, #101715 100%); border: 1px solid var(--line); border-radius: 14px; }
+  .label { font: 600 13px var(--cond); letter-spacing: 2px; text-transform: uppercase; color: var(--gold); display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+  .label::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--gold-dim), transparent); }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+
+  /* ---------- wybór składu ---------- */
+  .picker { padding: 16px; position: sticky; top: 12px; max-height: calc(100vh - 24px); display: flex; flex-direction: column; }
+  @media (max-width: 980px) { .picker { position: static; max-height: none; } }
+  .lineup { display: grid; grid-template-columns: 92px 1fr; gap: 12px; margin-bottom: 14px; }
+  .enemy-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .slot { position: relative; border: 1px dashed var(--line); border-radius: 10px; background: var(--panel2); cursor: pointer; padding: 0; overflow: hidden;
+    color: var(--muted); display: grid; place-items: center; transition: border-color .15s, transform .1s; }
+  .slot:hover { border-color: var(--muted); }
+  .slot.me { aspect-ratio: auto; height: 100%; min-height: 104px; }
+  .slot.enemy { aspect-ratio: 1.15; }
+  .slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .slot.filled { border-style: solid; }
+  .slot.me.filled { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold-dim), 0 6px 18px -8px var(--gold); }
+  .slot.enemy.filled { border-color: #7d3a2e; }
+  .slot.active { border-color: var(--text); border-style: solid; }
+  .slot.active::before { content: ""; position: absolute; inset: 0; border-radius: 9px; box-shadow: inset 0 0 0 2px var(--text); z-index: 2; pointer-events: none; }
+  .slot .plus { font: 400 22px var(--display); opacity: .6; }
+  .slot .tag { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 2px 2px; text-align: center; z-index: 1;
+    font: 600 11px var(--cond); letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,.85) 55%); color: var(--text); }
+  .slot.me .tag { color: var(--gold); }
+  .slot .x { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; line-height: 17px; border-radius: 50%; z-index: 3;
+    background: rgba(0,0,0,.7); color: #fff; font-size: 13px; text-align: center; opacity: 0; transition: opacity .12s; }
+  .slot:hover .x { opacity: 1; }
+  .search { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 11px; font: inherit; margin-bottom: 10px; }
+  .search:focus { outline: none; border-color: var(--gold-dim); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; overflow-y: auto; padding: 2px; margin: -2px; }
+  .hero { position: relative; aspect-ratio: 1; background: var(--panel2); border: 1px solid transparent; border-radius: 8px; padding: 0; overflow: hidden; cursor: pointer;
+    transition: transform .1s, border-color .12s; }
+  .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero span { position: absolute; left: 0; right: 0; bottom: 0; padding: 9px 2px 1px; font: 600 10px var(--cond); letter-spacing: .3px;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: linear-gradient(180deg, transparent, rgba(0,0,0,.9) 60%); }
+  .hero:hover { transform: translateY(-2px); border-color: var(--muted); }
+  .hero.me { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+  .hero.enemy { border-color: var(--enemy); box-shadow: inset 0 0 0 1px var(--enemy); }
+  .hero.me::after, .hero.enemy::after { position: absolute; top: 2px; left: 2px; padding: 0 4px; border-radius: 3px; font: 700 9px var(--cond); letter-spacing: .5px; }
+  .hero.me::after { content: "TY"; background: var(--gold); color: #1b1408; }
+  .hero.enemy::after { content: "VS"; background: var(--enemy); color: #fff; }
+
+  /* ---------- wynik ---------- */
+  #out { min-height: 300px; overflow: hidden; }
+  .empty { padding: 70px 24px; text-align: center; color: var(--muted); }
+  .empty b { display: block; font: 400 24px var(--display); color: var(--text); letter-spacing: 1px; margin-bottom: 6px; }
+  .empty.err b { color: var(--bad); }
+  .banner { position: relative; padding: 22px 24px; display: flex; gap: 20px; align-items: flex-end; min-height: 170px; overflow: hidden;
+    border-bottom: 1px solid var(--line); background: #0d1412; }
+  .banner .bg { position: absolute; inset: 0; background-size: cover; background-position: center 30%; opacity: .5; }
+  .banner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11,16,15,.95) 0%, rgba(11,16,15,.55) 55%, rgba(11,16,15,.2) 100%), linear-gradient(0deg, rgba(11,16,15,.9), transparent 60%); }
+  .banner > * { position: relative; z-index: 1; }
+  .banner .card { width: 96px; height: 128px; object-fit: cover; border-radius: 8px; border: 1px solid var(--gold-dim); box-shadow: 0 10px 30px -10px #000; flex: none; }
+  .banner .kicker { font: 600 13px var(--cond); letter-spacing: 2.5px; text-transform: uppercase; color: var(--gold); }
+  .banner h2 { font: 400 44px/1 var(--display); letter-spacing: 2px; margin: 2px 0 10px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .stat { background: rgba(0,0,0,.45); border: 1px solid var(--line); border-radius: 8px; padding: 4px 11px; font-size: 13px; color: var(--muted); backdrop-filter: blur(4px); }
+  .stat b { color: var(--text); font: 700 16px var(--cond); margin-right: 4px; }
+  .note { margin: 0; padding: 9px 24px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); background: rgba(232,185,100,.06); }
+  .note.warn { color: var(--gold); } .note.err { color: var(--bad); background: rgba(238,123,102,.07); }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--gold); border-top-color: transparent; border-radius: 50%;
+    animation: spin .8s linear infinite; vertical-align: -1px; margin-right: 7px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .block { padding: 18px 24px 6px; }
+  .block:last-child { padding-bottom: 22px; }
+  @media (max-width: 600px) { .block { padding: 16px 16px 4px; } .banner { padding: 18px 16px; } .banner h2 { font-size: 32px; } .note { padding: 9px 16px; } }
+
+  .versus { display: flex; flex-wrap: wrap; gap: 8px; }
+  .vs { display: flex; align-items: center; gap: 9px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 5px 12px 5px 5px; }
+  .vs img { width: 38px; height: 38px; border-radius: 7px; object-fit: cover; }
+  .vs .n { font: 600 14px var(--cond); letter-spacing: .4px; line-height: 1.1; }
+  .vs .g { color: var(--muted); font-size: 11px; }
+  .vs .d { font: 700 17px var(--cond); margin-left: 4px; }
+  .pos { color: var(--good); } .neg { color: var(--bad); }
+
+  /* ---------- kolejność zakupów ---------- */
+  .phase { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+  .phase-head { display: flex; align-items: baseline; gap: 10px; padding: 9px 14px; background: linear-gradient(90deg, var(--panel3), transparent); border-bottom: 1px solid var(--line); }
+  .phase-head b { font: 400 18px var(--display); letter-spacing: 1.5px; }
+  .phase-head span { color: var(--muted); font-size: 13px; }
+  .phase-head .sum { margin-left: auto; color: var(--souls); font: 600 15px var(--cond); }
+  .flow { display: flex; flex-wrap: wrap; gap: 14px 22px; padding: 16px 14px 14px; }
+  .tile { position: relative; width: 96px; border-radius: 9px; background: var(--c); box-shadow: 0 6px 14px -8px #000; transition: transform .12s; }
+  .tile:hover { transform: translateY(-3px); }
+  .tile.weapon { --c: var(--weapon); --plate: var(--weapon-plate); }
+  .tile.vitality { --c: var(--vitality); --plate: var(--vitality-plate); }
+  .tile.spirit { --c: var(--spirit); --plate: var(--spirit-plate); }
+  .flow .tile:not(:last-child)::after { content: ""; position: absolute; right: -15px; top: 30px; width: 7px; height: 7px;
+    border-top: 2px solid var(--gold-dim); border-right: 2px solid var(--gold-dim); transform: rotate(45deg); }
+  .tile .art { height: 66px; display: grid; place-items: center; border-radius: 9px 9px 0 0;
+    background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.22), transparent 70%); }
+  .tile .art img { width: 50px; height: 50px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+  .tile .plate { background: var(--plate); color: #1c1a15; font: 600 13px/1.1 var(--cond); text-align: center; padding: 5px 4px;
+    min-height: 39px; display: grid; place-items: center; }
+  .tile .foot { display: flex; justify-content: space-between; align-items: center; padding: 3px 7px 4px; background: rgba(0,0,0,.55);
+    border-radius: 0 0 9px 9px; font: 600 12px var(--cond); }
+  .tile .cost { color: var(--souls); }
+  .tile .rate { height: 3px; background: rgba(0,0,0,.35); }
+  .tile .rate i { display: block; height: 100%; background: #fff; opacity: .85; }
+  .tile .num { position: absolute; left: -7px; top: -7px; min-width: 21px; height: 21px; line-height: 20px; padding: 0 4px; border-radius: 11px; text-align: center;
+    background: var(--bg); border: 1px solid var(--gold-dim); color: var(--gold); font: 700 12px var(--cond); z-index: 1; }
+  .tile.boosted { box-shadow: 0 0 0 2px var(--good), 0 0 16px -2px rgba(154,216,98,.55); }
+  .tile.boosted .pct { color: var(--good); }
+  .tile .flag { position: absolute; right: -6px; top: -7px; padding: 0 5px; height: 17px; line-height: 17px; border-radius: 4px; z-index: 1;
+    background: var(--good); color: #10200a; font: 700 10px var(--cond); letter-spacing: .6px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 12px; margin: 2px 0 12px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+  /* ---------- kontry ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .ccard { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 12px 12px; }
+  .reasons { display: grid; gap: 8px; }
+  .reason { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: center; font-size: 12px; }
+  .reason img { width: 26px; height: 26px; border-radius: 5px; object-fit: cover; }
+  .reason .top { display: flex; justify-content: space-between; gap: 6px; font: 600 13px var(--cond); }
+  .reason .top span:last-child { color: var(--good); white-space: nowrap; }
+  .reason.down .top span:last-child { color: var(--bad); }
+  .meter { position: relative; height: 5px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 3px; overflow: hidden; }
+  .meter i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+  .meter .to { background: var(--good); } .meter .from { background: #cfd8d3; }
+  .reason.down .meter .from { background: var(--bad); } .reason.down .meter .to { background: #cfd8d3; }
+
+  .skeleton { padding: 24px; display: grid; gap: 14px; }
+  .skeleton div { height: 130px; border-radius: 12px; background: linear-gradient(100deg, var(--panel2) 30%, var(--panel3) 50%, var(--panel2) 70%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+  .skeleton div:first-child { height: 150px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  button.vs { cursor: pointer; text-align: left; }
+  button.vs:hover { border-color: var(--gold-dim); }
+  button.vs.current { border-color: var(--gold); }
+  .vs .rank { font: 700 13px var(--cond); color: var(--gold); width: 16px; text-align: center; }
+
+  /* ---------- tryb nakładki w grze ---------- */
+  body.overlay { zoom: .8; background: var(--bg); }
+  body.overlay header, body.overlay .picker, body.overlay footer { display: none; }
+  body.overlay main { grid-template-columns: 1fr; padding: 0; gap: 0; max-width: none; }
+  body.overlay .panel { border: 0; border-radius: 0; }
+  body.overlay .banner { min-height: 0; padding: 14px 16px; }
+  body.overlay .banner .card { width: 60px; height: 80px; }
+  body.overlay .banner h2 { font-size: 30px; margin-bottom: 6px; }
+  body.overlay .block { padding: 14px 16px 4px; }
+  body.overlay .note { padding: 8px 16px; }
+
+  footer { max-width: 1440px; margin: 0 auto; padding: 0 24px 30px; color: var(--muted); font-size: 12px; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="mark"><i></i></div>
+    <div>
+      <h1>Deadlock <em>Counter-Build</em></h1>
+      <p>Wybierz bohatera i skład wroga — zobaczysz, co w takim meczu kupują najlepsi gracze.</p>
+    </div>
+  </div>
+  <div class="ranks" id="ranks" role="group" aria-label="Zakres rang">
+    <button data-badge="110" class="on">Eternus</button>
+    <button data-badge="100">Ascendant+</button>
+    <button data-badge="80">Oracle+</button>
+    <button data-badge="">Wszyscy</button>
+  </div>
+</header>
+<main>
+  <section class="panel picker">
+    <div class="label">Skład</div>
+    <div class="lineup" id="slots"></div>
+    <input type="search" class="search" id="search" placeholder="Szukaj bohatera…" aria-label="Szukaj bohatera">
+    <div class="grid" id="grid"></div>
+  </section>
+  <section class="panel" id="out"><div class="skeleton"><div></div><div></div><div></div></div></section>
+</main>
+<footer>
+  Dane: <a href="https://deadlock-api.com/" target="_blank" rel="noopener">deadlock-api.com</a> (pobierane na żywo przy każdym otwarciu: mecze z ostatnich 14 dni albo od ostatniego patcha).
+  Nieoficjalne narzędzie, niepowiązane z Valve. Build pokazuje, co faktycznie kupują gracze z wybranej rangi — traktuj go jako podpowiedź.
+</footer>
+
+<script>
+const API = 'https://api.deadlock-api.com/v1';
+const PHASES = [
+  { name: 'Linia', sub: 'pierwsze ~9 minut', max: 540, take: 6 },
+  { name: 'Środek gry', sub: '9–20 minuta', max: 1200, take: 7 },
+  { name: 'Późna gra', sub: '20–30 minuta', max: 1800, take: 6 },
+  { name: 'Koniec gry', sub: 'po 30 minucie, gdy mecz się przeciąga', max: Infinity, take: 6 },
+];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+let heroes = [], items = new Map();
+let slots = [null, null, null, null, null, null, null]; // [0] = ja, 1..6 = wrogowie
+let active = 0;
+let badge = '110';
+// Strona otwarta przez moda w grze dostaje skład w adresie albo (gdy mod wpisał ją do pustego okna) w window.name.
+let overlayQuery = location.search || (String(window.name).startsWith('?overlay') ? window.name : '');
+const OVERLAY = new URLSearchParams(overlayQuery).has('overlay');
+let overlayAllies = [];
+if (OVERLAY) document.title = 'CB|boot';
+const statsCache = new Map(); // "hero|badge" -> dane
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(r.status === 429 ? 'Za dużo zapytań — odczekaj minutę.' :
+    r.status >= 500 ? 'Serwer statystyk jest przeciążony (' + r.status + '). Spróbuj za chwilę.' : 'Błąd API ' + r.status);
+  return r.json();
+}
+
+async function loadAssets() {
+  const cached = store.get('dl-assets-v3');
+  if (cached && Date.now() - cached.t < 6 * 3600e3) return cached;
+  const [h, it] = await Promise.all([
+    getJSON(API + '/assets/heroes?only_active=true'),
+    getJSON(API + '/assets/items/by-type/upgrade'),
+  ]);
+  const data = {
+    t: Date.now(),
+    // Nowi bohaterowie (np. Violet, Baba) mają flagę in_development, choć są grywalni — liczy się player_selectable.
+    heroes: h.filter(x => x.player_selectable && !x.disabled)
+      .map(x => ({ id: x.id, name: x.name, img: x.images?.icon_image_small_webp || x.images?.icon_hero_card_webp || '',
+        card: x.images?.icon_hero_card_webp || '', bg: x.images?.background_image_webp || '' }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    items: it.filter(x => x.shopable)
+      .map(x => ({ id: x.id, name: x.name, img: x.shop_image_webp || x.image_webp || '', slot: x.item_slot_type, tier: x.item_tier, cost: x.cost })),
+  };
+  store.set('dl-assets-v3', data);
+  return data;
+}
+
+function heroById(id) { return heroes.find(h => h.id === id); }
+
+function slotHtml(id, i) {
+  const h = id && heroById(id);
+  const cls = ['slot', i === 0 ? 'me' : 'enemy', h ? 'filled' : '', i === active ? 'active' : ''].join(' ');
+  const label = h ? h.name : i === 0 ? 'Ty' : 'Wróg ' + i;
+  return `<button class="${cls}" data-slot="${i}" title="${esc(label)}">` +
+    (h ? `<img src="${esc(i === 0 && h.card ? h.card : h.img)}" alt=""><span class="x" data-clear="${i}">×</span>` : '<span class="plus">+</span>') +
+    `<span class="tag">${esc(label)}</span></button>`;
+}
+
+function renderPicker() {
+  $('slots').innerHTML = slotHtml(slots[0], 0) + '<div class="enemy-slots">' + slots.slice(1).map((id, i) => slotHtml(id, i + 1)).join('') + '</div>';
+  const q = $('search').value.trim().toLowerCase();
+  $('grid').innerHTML = heroes.filter(h => !q || h.name.toLowerCase().includes(q)).map(h => {
+    const at = slots.indexOf(h.id);
+    const cls = 'hero' + (at === 0 ? ' me' : at > 0 ? ' enemy' : '');
+    return `<button class="${cls}" data-hero="${h.id}" title="${esc(h.name)}"><img src="${esc(h.img)}" alt="" loading="lazy"><span>${esc(h.name)}</span></button>`;
+  }).join('');
+}
+
+function pick(heroId) {
+  const prev = slots.indexOf(heroId);
+  if (prev >= 0) slots[prev] = null;
+  slots[active] = heroId;
+  const next = slots.findIndex((v, i) => v === null && i > 0);
+  if (slots[0] === null) active = 0; else if (next > 0) active = next;
+  if (OVERLAY) store.set('dl-overlay-me', slots[0]); else store.set('dl-slots', slots);
+  renderPicker();
+  refresh();
+}
+
+$('slots').addEventListener('click', e => {
+  const clear = e.target.closest('[data-clear]');
+  const slot = e.target.closest('[data-slot]');
+  if (!slot) return;
+  active = +slot.dataset.slot;
+  if (clear) { slots[active] = null; store.set('dl-slots', slots); refresh(); }
+  renderPicker();
+});
+$('grid').addEventListener('click', e => { const b = e.target.closest('[data-hero]'); if (b) pick(+b.dataset.hero); });
+$('search').addEventListener('input', renderPicker);
+$('ranks').addEventListener('click', e => {
+  const b = e.target.closest('[data-badge]'); if (!b) return;
+  badge = b.dataset.badge;
+  for (const x of $('ranks').children) x.classList.toggle('on', x === b);
+  store.set('dl-badge', badge);
+  refresh();
+});
+
+// ---------- dane i analiza ----------
+const RANK_LABELS = { '110': 'Eternus', '100': 'Ascendant+', '80': 'Oracle+', '': 'Wszyscy' };
+const MIN_GAMES = 400;   // poniżej tylu gier bohatera okno danych jest poszerzane
+const LONG_GAME_S = 2100; // "długa gra": ponad 35 minut
+const metaCache = new Map(); // "badge|since" -> Promise<{ games, vs }>
+let patchPromise = null;
+
+// Data ostatniego patcha (sekundy), 0 gdy nie udało się jej ustalić.
+function loadPatch() {
+  if (!patchPromise) patchPromise = getJSON(API + '/patches').then(list => {
+    let best = 0;
+    for (const p of list) {
+      const m = /(\d{2})-(\d{2})-(\d{4})/.exec(p.title || '');
+      const t = Math.max(m ? Date.UTC(+m[3], +m[1] - 1, +m[2]) : 0, Date.parse(p.pub_date) || 0);
+      if (t && t > best && t <= Date.now()) best = t;
+    }
+    return Math.floor(best / 1000);
+  }).catch(() => 0);
+  return patchPromise;
+}
+
+function loadMeta(badge, since) {
+  const key = badge + '|' + since;
+  if (!metaCache.has(key)) {
+    const b = (badge ? `&min_average_badge=${badge}` : '') + (since ? `&min_unix_timestamp=${since}` : '');
+    const p = Promise.all([
+      queued(`${API}/analytics/hero-stats?${b.slice(1)}`),
+      queued(`${API}/analytics/hero-counter-stats?same_lane_filter=false${b}`).catch(() => []),
+    ]).then(([hs, cs]) => ({
+      games: new Map(hs.map(r => [r.hero_id, { m: r.matches, w: r.wins }])),
+      vs: new Map(cs.map(r => [r.hero_id + '|' + r.enemy_hero_id, { m: r.matches_played, w: r.wins }])),
+    }));
+    p.catch(() => metaCache.delete(key));
+    metaCache.set(key, p);
+  }
+  return metaCache.get(key);
+}
+
+async function refresh() {
+  const me = slots[0];
+  if (!me) { renderEmpty(); return; }
+  const key = me + '|' + badge;
+  let entry = statsCache.get(key);
+  if (!entry) { entry = { badge, base: null, meta: null, vs: new Map(), err: null, since: null }; statsCache.set(key, entry); }
+  // Rysujemy tylko wtedy, gdy ten bohater i ranga są nadal wybrane.
+  const done = () => { if (statsCache.get(slots[0] + '|' + badge) === entry) renderResult(entry); };
+  const fail = e => { entry.err = e.message; statsCache.delete(key); done(); };
+  renderResult(entry);
+  if (entry.since === null) {
+    if (entry.starting) return;
+    entry.starting = true;
+    try {
+      // Okno danych: możliwie świeże. Najpierw ostatnie 14 dni (albo od patcha, jeśli jest nowszy),
+      // a gdy gier bohatera jest za mało — 14 dni, potem 30 dni (0 = domyślne 30 dni API).
+      const patch = await loadPatch();
+      const d14 = Math.floor(Date.now() / 86400e3) * 86400 - 14 * 86400;
+      let since, meta;
+      for (since of [...new Set([Math.max(patch, d14), d14, 0])]) {
+        meta = await loadMeta(badge, since);
+        if ((meta.games.get(me)?.m || 0) >= MIN_GAMES) break;
+      }
+      entry.patch = patch; entry.since = since; entry.meta = meta;
+    } catch (e) { return fail(e); }
+  }
+  const q = `hero_ids=${me}&min_matches=1` + (badge ? `&min_average_badge=${badge}` : '') +
+    (entry.since ? `&min_unix_timestamp=${entry.since}` : '');
+  if (!entry.base && !entry.baseLoading) {
+    entry.baseLoading = true;
+    queued(`${API}/analytics/item-stats?${q}`).then(d => { entry.base = d; done(); }, fail);
+  }
+  if (!entry.long && !entry.longLoading) {
+    // Późne itemy liczymy tylko z długich gier — w krótkich nikt nie zdąży ich kupić.
+    entry.longLoading = true;
+    const hq = (badge ? `&min_average_badge=${badge}` : '') + (entry.since ? `&min_unix_timestamp=${entry.since}` : '');
+    Promise.all([
+      queued(`${API}/analytics/item-stats?${q}&min_duration_s=${LONG_GAME_S}`),
+      queued(`${API}/analytics/hero-stats?min_duration_s=${LONG_GAME_S}${hq}`),
+    ]).then(([rows, hs]) => {
+      entry.long = { rows: new Map(rows.map(r => [r.item_id, r])), G: hs.find(r => r.hero_id === me)?.matches || 0 };
+      done();
+    }).catch(() => { entry.longLoading = false; });
+  }
+  for (const eid of slots.slice(1)) {
+    const cur = entry.vs.get(eid);
+    if (!eid || (cur && !cur.err)) continue; // mamy dane albo trwa pobieranie
+    entry.vs.set(eid, { loading: true });
+    queued(`${API}/analytics/item-stats?${q}&enemy_hero_ids=${eid}`).then(d => { entry.vs.set(eid, { rows: d }); done(); })
+      .catch(e => { entry.vs.set(eid, { err: e.message }); done(); });
+  }
+  done();
+}
+
+// Kolejka: najwyżej 2 zapytania naraz, z ponowieniem przy błędzie — API odrzuca zbyt wiele ciężkich zapytań jednocześnie.
+let running = 0; const waiting = [];
+function queued(url) {
+  return new Promise((resolve, reject) => { waiting.push({ url, resolve, reject, tries: 0 }); pump(); });
+}
+function pump() {
+  while (running < 2 && waiting.length) {
+    const job = waiting.shift(); running++;
+    getJSON(job.url).then(job.resolve, err => {
+      if (++job.tries < 3) { setTimeout(() => { waiting.push(job); pump(); }, 1500 * job.tries); return; }
+      job.reject(err);
+    }).finally(() => { running--; pump(); });
+  }
+}
+
+// Podstawa: jak często gracze z danej rangi kupują item na tym bohaterze (p0),
+// i jak ta częstość zmienia się, gdy w drużynie wroga jest konkretny bohater (pE).
+function analyze(me, base, meta, vs, enemies, long) {
+  const maxBase = Math.max(...base.map(r => r.matches));
+  const hero = meta.games.get(me);
+  const G = Math.max(hero ? hero.m : 0, maxBase);
+  const wr0 = hero && hero.m ? hero.w / hero.m : .5;
+  const en = [];
+  for (const eid of enemies) {
+    const data = vs.get(eid);
+    if (!data || !data.rows) continue;
+    const rows = new Map(data.rows.map(r => [r.item_id, r]));
+    const mu = meta.vs.get(me + '|' + eid);
+    const n = Math.max(mu ? mu.m : 0, ...data.rows.map(r => r.matches), 1);
+    en.push({ id: eid, n, rows, shift: mu && mu.m ? mu.w / mu.m - wr0 : null });
+  }
+  const rows = [];
+  for (const r of base) {
+    const it = items.get(r.item_id);
+    if (!it) continue;
+    const p0 = Math.min(1, r.matches / G);
+    let adj = 0, up = 0, down = 0; const vsList = [];
+    for (const e of en) {
+      const er = e.rows.get(r.item_id);
+      const pE = Math.min(1, (er ? er.matches : 0) / e.n);
+      const diff = pE - p0;
+      const z = diff / Math.sqrt(Math.max(p0 * (1 - p0), .01) / e.n);
+      if (Math.abs(z) < 2 || Math.abs(diff) < .02) continue;
+      adj += diff * e.n / (e.n + 150);
+      if (z > 0) up += z; else down += z;
+      vsList.push({ id: e.id, p0, pE, z });
+    }
+    vsList.sort((a, b) => b.z - a.z);
+    let p = p0 + adj, late = false;
+    if (long && long.G >= 100 && r.avg_buy_time_s >= 1200) {
+      const lr = long.rows.get(r.item_id);
+      const pL = Math.min(1, (lr ? lr.matches : 0) / long.G);
+      p = pL + adj * Math.min(3, pL / Math.max(p0, .02));
+      late = true;
+    }
+    rows.push({ it, p0, late, p: Math.min(1, Math.max(0, p)), wr: r.matches ? r.wins / r.matches : 0,
+      n: r.matches, t: r.avg_buy_time_s, up, down, vsList });
+  }
+  const phases = PHASES.map((ph, i) => {
+    const min = i ? PHASES[i - 1].max : 0;
+    // Wybieramy najczęściej kupowane, a potem układamy je w kolejności zakupu (od lewej do prawej).
+    return rows.filter(r => r.t >= min && r.t < ph.max && r.p >= .12).sort((a, b) => b.p - a.p).slice(0, ph.take)
+      .sort((a, b) => a.t - b.t);
+  });
+  const counters = rows.filter(r => r.up > 0 && r.p >= .05).sort((a, b) => b.up - a.up).slice(0, 8);
+  const avoid = rows.filter(r => r.down < 0 && r.up === 0 && r.p0 >= .12).sort((a, b) => a.down - b.down).slice(0, 4);
+  return { G, wr0, en, phases, counters, avoid };
+}
+
+const pp = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + ' pp';
+const pct = v => Math.round(v * 100) + '%';
+const num = v => (v ?? 0).toLocaleString('pl-PL');
+
+function itemTile(r, step) {
+  const it = r.it, boosted = r.up > 0;
+  const tip = `${it.name} — ${num(it.cost)} dusz, kupowany w ${pct(r.p)} ${r.late ? 'gier trwających ponad 35 minut' : 'gier'}, WR ${(r.wr * 100).toFixed(1)}%, zwykle ok. ${Math.round(r.t / 60)}. minuty`;
+  return `<div class="tile ${esc(it.slot)}${boosted ? ' boosted' : ''}" title="${esc(tip)}">` +
+    (step ? `<span class="num">${step}</span>` : '') + (boosted && step ? '<span class="flag">KONTRA</span>' : '') +
+    `<div class="art">${it.img ? `<img src="${esc(it.img)}" alt="" loading="lazy">` : ''}</div>` +
+    `<div class="plate">${esc(it.name)}</div><div class="rate"><i style="width:${Math.round(r.p * 100)}%"></i></div>` +
+    `<div class="foot"><span class="cost">${num(it.cost)}</span><span class="pct">${pct(r.p)}</span></div></div>`;
+}
+
+function counterCard(r, mode) {
+  const down = mode === 'avoid';
+  const list = (down ? [...r.vsList].reverse() : r.vsList).filter(v => down ? v.z < 0 : v.z > 0).slice(0, 3);
+  const reasons = list.map(v => {
+    const h = heroById(v.id); if (!h) return '';
+    const lo = Math.min(v.p0, v.pE) * 100, hi = Math.max(v.p0, v.pE) * 100;
+    return `<div class="reason${down ? ' down' : ''}"><img src="${esc(h.img)}" alt=""><div>` +
+      `<div class="top"><span>vs ${esc(h.name)}</span><span>${pct(v.p0)} → ${pct(v.pE)}</span></div>` +
+      `<div class="meter"><i class="${down ? 'from' : 'to'}" style="width:${hi}%"></i><i class="${down ? 'to' : 'from'}" style="width:${lo}%"></i></div></div></div>`;
+  }).join('');
+  return `<div class="ccard">${itemTile(r, 0)}<div class="reasons">${reasons}</div></div>`;
+}
+
+// Który bohater statystycznie najlepiej wypada przeciwko temu składowi (z winrate'ów bohater kontra bohater).
+function bestPicks(meta, enemies) {
+  const out = [];
+  for (const h of heroes) {
+    const g = meta.games.get(h.id);
+    if (!g || g.m < 150 || enemies.includes(h.id)) continue;
+    const base = g.w / g.m; let adj = 0, n = 0;
+    for (const e of enemies) {
+      const mu = meta.vs.get(h.id + '|' + e);
+      if (!mu || !mu.m) continue;
+      adj += (mu.w / mu.m - base) * mu.m / (mu.m + 150); n++;
+    }
+    if (n) out.push({ h, wr: base + adj, base });
+  }
+  return out.sort((a, b) => b.wr - a.wr);
+}
+
+function renderEmpty() {
+  if (OVERLAY && overlayAllies.length) {
+    $('out').innerHTML = '<div class="block"><div class="label">Kim grasz?</div><div class="versus">' + overlayAllies.map(id => {
+      const h = heroById(id);
+      return `<button class="vs" data-pick="${id}"><img src="${esc(h.img)}" alt=""><div class="n">${esc(h.name)}</div></button>`;
+    }).join('') + '</div></div>';
+  } else {
+    $('out').innerHTML = '<div class="empty"><b>Wybierz swojego bohatera</b>Kliknij portret po lewej, a potem dodaj przeciwników.</div>';
+  }
+}
+
+$('out').addEventListener('click', e => {
+  const b = e.target.closest('[data-pick]'); if (!b) return;
+  active = 0; pick(+b.dataset.pick);
+});
+
+function renderResult(entry) {
+  const out = $('out'), me = heroById(slots[0]);
+  if (!me) return;
+  if (entry.err) { out.innerHTML = `<div class="empty err"><b>Coś poszło nie tak</b>${esc(entry.err)}</div>`; return; }
+  if (!entry.base || !entry.meta) { out.innerHTML = '<div class="skeleton"><div></div><div></div><div></div></div>'; return; }
+  if (!entry.base.length) { out.innerHTML = '<div class="empty"><b>Brak danych</b>Dla tego bohatera nie ma gier w wybranym zakresie rang. Wybierz szerszy zakres u góry.</div>'; return; }
+  const enemies = slots.slice(1).filter(Boolean);
+  const a = analyze(me.id, entry.base, entry.meta, entry.vs, enemies, entry.long);
+  const fromPatch = entry.since && entry.since === entry.patch;
+  const day = t => new Date(t * 1000).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
+
+  let html = `<div class="banner">${me.bg ? `<div class="bg" style="background-image:url('${esc(encodeURI(me.bg))}')"></div>` : ''}` +
+    (me.card ? `<img class="card" src="${esc(me.card)}" alt="">` : '') +
+    `<div><div class="kicker">Build na ten mecz</div><h2>${esc(me.name)}</h2><div class="stats">` +
+    `<span class="stat"><b>${num(a.G)}</b>gier</span>` +
+    `<span class="stat"><b>${RANK_LABELS[entry.badge]}</b>ranga</span>` +
+    `<span class="stat"><b>${(a.wr0 * 100).toFixed(1)}%</b>winrate</span>` +
+    `<span class="stat"><b>${fromPatch ? 'od ' + day(entry.since) : entry.since ? '14 dni' : '30 dni'}</b>${fromPatch ? 'aktualny patch' : 'najnowsze mecze'}</span>` +
+    '</div></div></div>';
+
+  const pending = enemies.filter(id => entry.vs.get(id)?.loading).length;
+  const failed = enemies.filter(id => entry.vs.get(id)?.err);
+  if (pending) html += `<p class="note"><span class="spinner"></span>Pobieram dane o przeciwnikach (${enemies.length - pending - failed.length}/${enemies.length})…</p>`;
+  if (failed.length) html += `<p class="note err">Brak danych dla: ${failed.map(id => esc(heroById(id)?.name ?? id)).join(', ')} (${esc(entry.vs.get(failed[0]).err)}). Kliknij bohatera ponownie, żeby spróbować jeszcze raz.</p>`;
+  if (!entry.since) html += '<p class="note warn">W ostatnich 14 dniach jest za mało gier tego bohatera w tej randze, więc dane są z 30 dni.</p>';
+  if (a.G < 500) html += '<p class="note warn">To mała próba gier — rozważ szerszy zakres rang u góry strony.</p>';
+  if (!enemies.length) html += '<p class="note">To build ogólny. Dodaj przeciwników po lewej, żeby dopasować go do meczu.</p>';
+
+  if (a.en.length) {
+    html += '<div class="block"><div class="label">Przeciwnicy</div><div class="versus">' + a.en.map(m => {
+      const h = heroById(m.id), v = m.shift === null ? null : m.shift * 100;
+      return `<div class="vs" title="O tyle częściej lub rzadziej wygrywasz, gdy ten bohater jest po stronie wroga">` +
+        (h ? `<img src="${esc(h.img)}" alt="">` : '') + `<div><div class="n">${esc(h ? h.name : m.id)}</div><div class="g">${num(m.n)} gier</div></div>` +
+        (v === null ? '' : `<span class="d ${v >= 0 ? 'pos' : 'neg'}">${pp(v)}</span>`) + '</div>';
+    }).join('') + '</div></div>';
+  }
+
+  if (enemies.length && entry.meta.vs.size) {
+    const picks = bestPicks(entry.meta, enemies), mine = picks.findIndex(x => x.h.id === me.id);
+    const pool = OVERLAY && overlayAllies.length ? null : picks.slice(0, 6);
+    const row = (x, i) => `<button class="vs${x.h.id === me.id ? ' current' : ''}" data-pick="${x.h.id}" title="Zwykle ${(x.base * 100).toFixed(1)}%, na ten skład ${(x.wr * 100).toFixed(1)}%">` +
+      `<span class="rank">${i + 1}</span><img src="${esc(x.h.img)}" alt=""><div><div class="n">${esc(x.h.name)}</div><div class="g">zwykle ${(x.base * 100).toFixed(1)}%</div></div>` +
+      `<span class="d ${x.wr >= x.base ? 'pos' : 'neg'}">${(x.wr * 100).toFixed(1)}%</span></button>`;
+    if (picks.length) html += '<div class="block"><div class="label">Najlepszy wybór na ten skład</div><div class="versus">' +
+      (pool || picks.slice(0, 6)).map(row).join('') + (mine >= 6 ? row(picks[mine], mine) : '') +
+      '</div><p class="hint" style="margin-top:8px">Przewidywany winrate bohatera przeciwko tym wrogom w wybranej randze. Kliknij, żeby zobaczyć jego build.</p></div>';
+  }
+
+  html += '<div class="block"><div class="label">Kolejność zakupów</div>' +
+    '<div class="legend"><span>Kupuj od lewej do prawej.</span>' +
+    '<span><i style="background:var(--weapon)"></i>Broń</span><span><i style="background:var(--vitality)"></i>Witalność</span><span><i style="background:var(--spirit)"></i>Spirit</span>' +
+    '<span>Procent = w ilu grach gracze biorą item (po 20. minucie: w ilu grach dłuższych niż 35 minut).</span>' +
+    (a.en.length ? '<span><i style="background:var(--good)"></i>Kontra = częściej kupowany na ten skład</span>' : '') + '</div>';
+  let step = 0;
+  PHASES.forEach((p, i) => {
+    if (!a.phases[i].length) return;
+    const sum = a.phases[i].reduce((s, r) => s + (r.it.cost || 0), 0);
+    html += `<div class="phase"><div class="phase-head"><b>${p.name}</b><span>${p.sub}</span><span class="sum">${num(sum)} dusz</span></div><div class="flow">` +
+      a.phases[i].map(r => itemTile(r, ++step)).join('') + '</div></div>';
+  });
+  html += '</div>';
+
+  if (a.counters.length) html += '<div class="block"><div class="label">Kontry na ten skład</div><p class="hint">Itemy, które gracze kupują wyraźnie częściej przeciwko tym bohaterom. Pasek pokazuje, jak rośnie częstość zakupu.</p><div class="cards">' +
+    a.counters.map(r => counterCard(r, 'counter')).join('') + '</div></div>';
+  else if (a.en.length && !pending) html += '<div class="block"><div class="label">Kontry na ten skład</div><p class="hint">Przeciwko temu składowi gracze nie zmieniają wyraźnie zakupów — graj build standardowy.</p></div>';
+  if (a.avoid.length) html += '<div class="block"><div class="label">Rzadziej kupowane w tym meczu</div><p class="hint">Popularne itemy, z których gracze częściej rezygnują przeciwko temu składowi.</p><div class="cards">' +
+    a.avoid.map(r => counterCard(r, 'avoid')).join('') + '</div></div>';
+  out.innerHTML = html;
+}
+
+// Ustawia skład z zapytania nakładki: me=, allies=, enemies= (angielskie nazwy bohaterów).
+function applyOverlay() {
+  const params = new URLSearchParams(overlayQuery);
+  const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const find = n => heroes.find(h => norm(h.name) === norm(n))?.id ?? null;
+  const list = key => (params.get(key) || '').split(',').filter(Boolean).map(find).filter(Boolean);
+  const enemies = list('enemies'); overlayAllies = list('allies');
+  const remembered = store.get('dl-overlay-me');
+  const mine = find(params.get('me') || '') ?? (overlayAllies.includes(remembered) ? remembered : null);
+  slots = [mine, ...enemies.slice(0, 6)]; while (slots.length < 7) slots.push(null);
+  // Tytuł strony to jedyne, co mod widzi z okna — służy do diagnostyki w logu gry.
+  document.title = `CB|loaded|me=${mine ?? '?'}|allies=${overlayAllies.length}|enemies=${enemies.length}|${Date.now() % 100000}`;
+}
+// Mod woła to przy każdej zmianie składu.
+window.__cbUpdate = q => {
+  overlayQuery = q;
+  if (!heroes.length) return; // lista bohaterów jeszcze się pobiera; init użyje nowego zapytania
+  applyOverlay(); renderPicker(); refresh();
+};
+
+(async function init() {
+  try {
+    const a = await loadAssets();
+    heroes = a.heroes; items = new Map(a.items.map(i => [i.id, i]));
+    if (OVERLAY) {
+      document.body.classList.add('overlay');
+      applyOverlay();
+    } else {
+      const saved = store.get('dl-slots');
+      if (Array.isArray(saved) && saved.length === 7) slots = saved.map(id => heroById(id) ? id : null);
+    }
+    const savedBadge = store.get('dl-badge');
+    if (typeof savedBadge === 'string' && savedBadge in RANK_LABELS) {
+      badge = savedBadge;
+      for (const x of $('ranks').children) x.classList.toggle('on', x.dataset.badge === badge);
+    }
+    const firstEmpty = slots.indexOf(null);
+    active = firstEmpty < 0 ? 0 : firstEmpty;
+    renderPicker();
+    refresh();
+  } catch (e) {
+    $('out').innerHTML = `<div class="empty err"><b>Nie udało się pobrać listy bohaterów</b>${esc(e.message)}</div>`;
+  }
+})();
+</script>
+</body>
+</html>
