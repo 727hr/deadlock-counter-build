@@ -177,15 +177,49 @@
   .vs .rank { font: 700 13px var(--cond); color: var(--gold); width: 16px; text-align: center; }
 
   /* ---------- tryb nakładki w grze ---------- */
-  body.overlay { zoom: .8; background: var(--bg); }
+  /* Okno w grze jest wąskie (ok. 450–650 px), więc wszystko układa się w siatkach na całą szerokość. */
+  body.overlay { background: var(--bg); font-size: 17px; }
   body.overlay header, body.overlay .picker, body.overlay footer { display: none; }
   body.overlay main { grid-template-columns: 1fr; padding: 0; gap: 0; max-width: none; }
   body.overlay .panel { border: 0; border-radius: 0; }
-  body.overlay .banner { min-height: 0; padding: 14px 16px; }
-  body.overlay .banner .card { width: 60px; height: 80px; }
-  body.overlay .banner h2 { font-size: 30px; margin-bottom: 6px; }
-  body.overlay .block { padding: 14px 16px 4px; }
-  body.overlay .note { padding: 8px 16px; }
+  body.overlay .legend, body.overlay .hint, body.overlay .banner .kicker { display: none; }
+  body.overlay .banner { min-height: 0; padding: 12px 14px; align-items: center; gap: 14px; }
+  body.overlay .banner .card { width: 66px; height: 88px; }
+  body.overlay .banner h2 { font-size: 34px; margin: 0 0 8px; }
+  body.overlay .stats { gap: 6px; }
+  body.overlay .stat { font-size: 14px; padding: 3px 9px; }
+  body.overlay .stat b { font-size: 18px; }
+  body.overlay .block { padding: 14px 14px 2px; }
+  body.overlay .note { padding: 8px 14px; font-size: 15px; }
+  body.overlay .label { font-size: 15px; margin-bottom: 9px; }
+  body.overlay .versus { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  body.overlay .vs { padding: 5px 9px 5px 5px; min-width: 0; }
+  body.overlay .vs > div { min-width: 0; flex: 1; }
+  body.overlay .vs img { width: 40px; height: 40px; }
+  body.overlay .vs .n { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.overlay .vs .g { font-size: 12px; white-space: nowrap; }
+  body.overlay .vs .d { font-size: 19px; }
+  body.overlay .phase { margin-bottom: 8px; }
+  body.overlay .phase-head { padding: 8px 12px; }
+  body.overlay .phase-head b { font-size: 20px; }
+  body.overlay .phase-head span { font-size: 14px; }
+  body.overlay .phase-head .sum { font-size: 17px; }
+  body.overlay .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 10px; padding: 14px 12px 12px; }
+  body.overlay .flow .tile { width: auto; }
+  body.overlay .flow .tile::after { display: none; }
+  body.overlay .tile .art { height: 74px; }
+  body.overlay .tile .art img { width: 58px; height: 58px; }
+  body.overlay .tile .plate { font-size: 16px; min-height: 46px; }
+  body.overlay .tile .foot { font-size: 15px; }
+  body.overlay .tile .num { font-size: 14px; min-width: 24px; height: 24px; line-height: 23px; border-radius: 12px; }
+  body.overlay .tile .flag { font-size: 11px; height: 19px; line-height: 19px; }
+  body.overlay .cards { grid-template-columns: 1fr; }
+  body.overlay .ccard { grid-template-columns: 104px 1fr; }
+  body.overlay .reason { font-size: 14px; grid-template-columns: 30px 1fr; }
+  body.overlay .reason img { width: 30px; height: 30px; }
+  body.overlay .reason .top { font-size: 16px; }
+  @media (min-width: 700px) { body.overlay .flow { grid-template-columns: repeat(5, minmax(0, 1fr)); } body.overlay .versus { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 430px) { body.overlay .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
   footer { max-width: 1440px; margin: 0 auto; padding: 0 24px 30px; color: var(--muted); font-size: 12px; }
   footer a { color: var(--muted); }
