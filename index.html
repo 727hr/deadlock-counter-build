@@ -243,6 +243,62 @@
   @media (min-width: 700px) { body.overlay .flow { grid-template-columns: repeat(5, minmax(0, 1fr)); } body.overlay .versus { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 430px) { body.overlay .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
+  /* ---------- nawigacja, podsumowanie meczu, profil ---------- */
+  .nav { display: flex; gap: 4px; }
+  .nav a { color: var(--muted); text-decoration: none; font: 600 15px var(--cond); letter-spacing: .8px; text-transform: uppercase; padding: 6px 12px; border-radius: 999px; }
+  .nav a:hover { color: var(--text); }
+  .nav a.on { color: var(--text); background: var(--panel2); box-shadow: inset 0 0 0 1px var(--line); }
+  body.summary .picker { display: none; }
+  body.summary main { grid-template-columns: 1fr; max-width: 1100px; }
+  .scorebox { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; min-width: 140px; }
+  .scorebox b { font: 400 20px var(--display); letter-spacing: 1px; }
+  .scorebox span { color: var(--muted); font-size: 12px; }
+  .ring { width: 104px; height: 104px; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 10; }
+  .ring-bg { stroke: rgba(255,255,255,.1); }
+  .ring-fg { stroke: var(--gold); stroke-linecap: round; }
+  .ring text { transform: rotate(90deg); transform-origin: 60px 60px; fill: var(--text); font: 700 36px var(--cond); }
+  .chart { width: 100%; height: auto; display: block; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; }
+  .chart .g { stroke: rgba(255,255,255,.06); }
+  .chart .ax { fill: var(--muted); font: 600 11px var(--cond); }
+  .chart .band { fill: rgba(147,163,155,.14); }
+  .chart .avg { fill: none; stroke: #93a39b; stroke-width: 2; stroke-dasharray: 5 4; }
+  .chart .opp { fill: none; stroke: var(--enemy); stroke-width: 2; opacity: .8; }
+  .chart .you { fill: none; stroke: var(--gold); stroke-width: 3; }
+  .chart .you-dot { fill: var(--gold); }
+  .parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+  .part { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .part .top { display: flex; justify-content: space-between; font: 600 16px var(--cond); }
+  .part .top span { font-size: 22px; }
+  .part .meter { height: 6px; margin: 6px 0; }
+  .part .g { color: var(--muted); font-size: 12px; }
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 700px) { .twocol { grid-template-columns: 1fr; } }
+  .chk { display: flex; justify-content: space-between; gap: 10px; padding: 7px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; font-size: 14px; }
+  .chk em { color: var(--muted); font-style: normal; font-size: 12px; }
+  .cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .core { display: grid; grid-template-columns: 34px 1fr; gap: 0 8px; align-items: center; background: var(--panel2); border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: 8px; padding: 6px 8px; }
+  .core img { width: 34px; height: 34px; object-fit: contain; grid-row: span 2; }
+  .core b { font: 600 13px var(--cond); }
+  .core span { color: var(--muted); font-size: 11px; }
+  .core.late { border-left-color: var(--gold); } .core.miss { border-left-color: var(--bad); opacity: .75; }
+  .htable { display: grid; gap: 4px; }
+  .hrow { display: grid; grid-template-columns: minmax(150px, 2fr) 1.1fr .8fr 1fr .8fr .8fr .9fr; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 8px;
+    background: var(--panel2); border: 1px solid var(--line); color: inherit; text-decoration: none; font-size: 14px; }
+  .hrow:not(.head):hover { border-color: var(--gold-dim); }
+  .hrow.head { background: none; border: 0; color: var(--muted); font: 600 12px var(--cond); letter-spacing: 1px; text-transform: uppercase; }
+  .hrow .hn { display: flex; align-items: center; gap: 8px; font: 600 15px var(--cond); }
+  .hrow .hn img { width: 30px; height: 30px; border-radius: 6px; object-fit: cover; }
+  .hrow span { position: relative; }
+  .hrow .bar { position: absolute; left: 0; bottom: -4px; height: 3px; background: var(--gold-dim); border-radius: 2px; }
+  .hrow em { color: var(--muted); font-style: normal; font-size: 12px; }
+  .hrow .go { color: var(--gold); font-size: 12px; text-align: right; }
+  .mh .hrow { grid-template-columns: minmax(150px, 2fr) 1fr 1fr 1fr .8fr .9fr .9fr; }
+  @media (max-width: 760px) { .hrow, .mh .hrow { grid-template-columns: 1.6fr 1fr 1fr; } .hrow > span:nth-child(n+4) { display: none; } }
+  .psearch { display: flex; gap: 8px; margin-top: 14px; justify-content: center; }
+  .psearch .search { margin: 0; max-width: 360px; }
+  .psearch .vs { padding: 6px 14px; cursor: pointer; }
+
   footer { max-width: 1440px; margin: 0 auto; padding: 0 24px 30px; color: var(--muted); font-size: 12px; }
   footer a { color: var(--muted); }
 </style>
@@ -256,6 +312,7 @@
       <p>Pick your hero and the enemy team to see what top players buy in that matchup.</p>
     </div>
   </div>
+  <nav class="nav" id="nav"><a href="./" data-nav="build">Build</a><a href="?profile=1" data-nav="profile">Profile</a><a href="?summary=1" data-nav="summary">Last match</a></nav>
   <div class="ranks" id="ranks" role="group" aria-label="Rank range">
     <button data-badge="110" class="on">Eternus</button>
     <button data-badge="100">Ascendant+</button>
@@ -380,6 +437,7 @@ $('slots').addEventListener('click', e => {
 $('grid').addEventListener('click', e => { const b = e.target.closest('[data-hero]'); if (b) pick(+b.dataset.hero); });
 $('search').addEventListener('input', renderPicker);
 $('ranks').addEventListener('click', e => {
+  if (document.body.classList.contains('summary')) { const b = e.target.closest('[data-badge]'); if (b) { store.set('dl-badge', b.dataset.badge); location.reload(); } return; }
   const b = e.target.closest('[data-badge]'); if (!b) return;
   badge = b.dataset.badge;
   for (const x of $('ranks').children) x.classList.toggle('on', x === b);
@@ -388,7 +446,7 @@ $('ranks').addEventListener('click', e => {
 });
 
 // ---------- dane i analiza ----------
-const RANK_LABELS = { '110': 'Eternus', '100': 'Ascendant+', '80': 'Oracle+', '': 'Wszyscy' };
+const RANK_LABELS = { '110': 'Eternus', '100': 'Ascendant+', '80': 'Oracle+', '': 'All ranks' };
 const MIN_GAMES = 400;   // poniżej tylu gier bohatera okno danych jest poszerzane
 const LONG_GAME_S = 2100; // "długa gra": ponad 35 minut
 const metaCache = new Map(); // "badge|since" -> Promise<{ games, vs }>
@@ -562,6 +620,281 @@ function analyze(me, base, meta, vs, enemies, long) {
   return { G, wr0, en, phases, counters, avoid, rows };
 }
 
+// ---------- podsumowanie meczu (?summary=1&acc=…[&match=…]) ----------
+// Dane: historia meczów gracza i szczegóły meczu z deadlock-api oraz krzywa graczy z wybranej rangi
+// na tym bohaterze (średnia i odchylenie w kolejnych procentach czasu meczu).
+const DEFENSIVE = ['metalskin', 'returnfire', 'platedarmor', 'weaponshielding', 'spiritshielding', 'spiritresilience',
+  'reactivebarrier', 'debuffreducer', 'dispelmagic', 'unstoppable', 'counterspell', 'etherealshift'];
+
+const cdf = z => { // rozkład normalny: z → percentyl 0..1
+  const t = 1 / (1 + .2316419 * Math.abs(z)), d = .3989423 * Math.exp(-z * z / 2);
+  const p = d * t * (.3193815 + t * (-.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return z > 0 ? 1 - p : p;
+};
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const toAccount = v => { v = String(v || '').replace(/[^0-9]/g, ''); if (!v) return ''; const n = BigInt(v); return String(n > 76561197960265728n ? n - 76561197960265728n : n); };
+
+// Wartość krzywej w danym procencie meczu (interpolacja między punktami co 5%).
+function curveAt(curve, pctTime, key) {
+  const pts = curve.filter(r => r[key + '_avg'] !== undefined);
+  if (!pts.length) return null;
+  let a = pts[0], b = pts[pts.length - 1];
+  for (let i = 0; i < pts.length - 1; i++) if (pts[i].game_time <= pctTime && pts[i + 1].game_time >= pctTime) { a = pts[i]; b = pts[i + 1]; break; }
+  const f = b.game_time === a.game_time ? 0 : (pctTime - a.game_time) / (b.game_time - a.game_time);
+  return { avg: a[key + '_avg'] + f * (b[key + '_avg'] - a[key + '_avg']), std: Math.max(1e-6, a[key + '_std'] + f * (b[key + '_std'] - a[key + '_std'])) };
+}
+
+function soulsChart(me, dur, curve, opps) {
+  const W = 720, H = 260, L = 46, R = 12, T = 12, B = 30;
+  const pts = me.stats.map(s => [s.time_stamp_s, s.net_worth]);
+  const band = [];
+  for (let p = 0; p <= 100; p += 5) { const c = curveAt(curve, p, 'net_worth'); if (c) band.push([p / 100 * dur, c.avg, c.std]); }
+  const oppLines = opps.map(o => o.stats.map(s => [s.time_stamp_s, s.net_worth]));
+  const maxY = Math.max(...pts.map(p => p[1]), ...band.map(b => b[1] + b[2]), ...oppLines.flat().map(p => p[1]), 1000) * 1.05;
+  const x = t => L + (t / dur) * (W - L - R), y = v => T + (1 - v / maxY) * (H - T - B);
+  const path = arr => arr.map((p, i) => (i ? 'L' : 'M') + x(p[0]).toFixed(1) + ' ' + y(p[1]).toFixed(1)).join(' ');
+  const area = band.map(b => [b[0], b[1] + b[2]]).concat(band.slice().reverse().map(b => [b[0], Math.max(0, b[1] - b[2])]));
+  let grid = '';
+  for (let m = 5; m * 60 < dur; m += 5) grid += `<line x1="${x(m * 60)}" x2="${x(m * 60)}" y1="${T}" y2="${H - B}" class="g"/><text x="${x(m * 60)}" y="${H - 10}" class="ax" text-anchor="middle">${m}m</text>`;
+  for (let v = 10000; v < maxY; v += 10000) grid += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="g"/><text x="${L - 6}" y="${y(v) + 4}" class="ax" text-anchor="end">${v / 1000}k</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Souls over time">${grid}` +
+    `<path d="${path(area)} Z" class="band"/><path d="${path(band)}" class="avg"/>` +
+    oppLines.map(l => `<path d="${path(l)}" class="opp"/>`).join('') +
+    `<path d="${path(pts)}" class="you"/>` + pts.map(p => `<circle cx="${x(p[0])}" cy="${y(p[1])}" r="3.5" class="you-dot"><title>${mmss(p[0])} — ${num(p[1])} souls</title></circle>`).join('') +
+    `</svg>`;
+}
+
+async function loadSummary(acc, matchId) {
+  const hist = await getJSON(`${API}/players/${acc}/match-history`);
+  const list = (Array.isArray(hist) ? hist : hist.matches || []).filter(m => m.match_mode === 1 || m.match_mode === 4 || m.match_mode === undefined);
+  if (!list.length) throw new Error('No matches found for this account.');
+  const row = matchId ? list.find(m => String(m.match_id) === String(matchId)) || { match_id: matchId } : list[0];
+  const meta = (await getJSON(`${API}/matches/${row.match_id}/metadata`)).match_info;
+  const me = meta.players.find(p => String(p.account_id) === acc);
+  if (!me) throw new Error('This account was not in match ' + row.match_id + '.');
+  const dur = meta.duration_s, b = badge ? `&min_average_badge=${badge}` : '';
+  const since = Math.floor(Date.now() / 86400e3) * 86400 - 30 * 86400;
+  const [curve, curveAll, base, hs] = await Promise.all([
+    getJSON(`${API}/analytics/player-performance-curve?hero_ids=${me.hero_id}&resolution=5${b}&min_duration_s=${Math.max(0, dur - 360)}&max_duration_s=${dur + 360}&min_unix_timestamp=${since}`),
+    getJSON(`${API}/analytics/player-performance-curve?hero_ids=${me.hero_id}&resolution=5${b}&min_unix_timestamp=${since}`),
+    getJSON(`${API}/analytics/item-stats?hero_ids=${me.hero_id}&min_matches=1${b}&min_unix_timestamp=${since}`),
+    getJSON(`${API}/analytics/hero-stats?min_unix_timestamp=${since}${b}`),
+  ]);
+  return { list, row, meta, me, dur, curve: curve.length ? curve : curveAll, curveAll, base, games: hs.find(h => h.hero_id === me.hero_id)?.matches || 0 };
+}
+
+function analyzeMatch(d) {
+  const { meta, me, dur, curve } = d, end = me.stats[me.stats.length - 1];
+  const at = (key, p = 100) => curveAt(curve, p, key);
+  const z = (v, c) => c ? (v - c.avg) / c.std : 0;
+  const opps = meta.players.filter(p => p.team !== me.team && p.assigned_lane === me.assigned_lane);
+  const statAt = (p, t) => p.stats.reduce((best, s) => Math.abs(s.time_stamp_s - t) < Math.abs(best.time_stamp_s - t) ? s : best, p.stats[0]);
+
+  // Składowe oceny (każda 0..100).
+  const farmZ = z(end.net_worth, at('net_worth'));
+  const ka = { avg: (at('kills')?.avg || 0) + (at('assists')?.avg || 0), std: Math.hypot(at('kills')?.std || 1, at('assists')?.std || 1) };
+  const kaZ = z(end.kills + end.assists, ka), deathZ = -z(end.deaths, at('deaths'));
+  const dmgZ = z(end.player_damage, at('player_damage'));
+  const laneT = Math.min(540, dur), myLane = statAt(me, laneT).net_worth;
+  const oppLane = opps.length ? opps.reduce((s, o) => s + statAt(o, laneT).net_worth, 0) / opps.length : null;
+  const laneScore = oppLane ? clamp(50 + (myLane / oppLane - 1) * 100, 0, 100) : Math.round(cdf(z(myLane, at('net_worth', laneT / dur * 100))) * 100);
+
+  // Build: czy kupiony był "core" (itemy brane w ≥60% gier) i jak bardzo po czasie.
+  const G = Math.max(d.games, ...d.base.map(r => r.matches));
+  const core = d.base.filter(r => items.has(r.item_id) && r.matches / G >= .6 && r.avg_buy_time_s < dur);
+  const bought = new Map();
+  for (const it of me.items) if (items.has(it.item_id) && !bought.has(it.item_id)) bought.set(it.item_id, it.game_time_s);
+  const coreRows = core.map(r => ({ it: items.get(r.item_id), avg: r.avg_buy_time_s, at: bought.get(r.item_id) }));
+  const got = coreRows.filter(r => r.at !== undefined);
+  const delay = got.length ? got.reduce((s, r) => s + Math.max(0, r.at - r.avg), 0) / got.length : 0;
+  const buildScore = core.length ? clamp(100 * (got.length / core.length) * (1 - Math.min(1, delay / 900) * .5), 0, 100) : 50;
+
+  const parts = [
+    { key: 'Farm', w: 25, v: Math.round(cdf(farmZ) * 100), note: `${num(end.net_worth)} souls (rank avg ${num(Math.round(at('net_worth')?.avg || 0))})` },
+    { key: 'Laning', w: 15, v: Math.round(laneScore), note: oppLane ? `${num(myLane)} vs ${num(Math.round(oppLane))} souls at ${mmss(laneT)}` : `${num(myLane)} souls at ${mmss(laneT)}` },
+    { key: 'Fights', w: 25, v: Math.round((cdf(kaZ) * .5 + cdf(deathZ) * .5) * 100), note: `${end.kills}/${end.deaths}/${end.assists} KDA` },
+    { key: 'Damage', w: 20, v: Math.round(cdf(dmgZ) * 100), note: `${num(end.player_damage)} hero damage` },
+    { key: 'Build', w: 15, v: Math.round(buildScore), note: core.length ? `${got.length}/${core.length} core items` + (got.length ? `, ${delay > 30 ? mmss(delay) + ' late on average' : 'on time'}` : '') : 'no core data' },
+  ];
+  const score = Math.round(parts.reduce((s, p) => s + p.v * p.w, 0) / parts.reduce((s, p) => s + p.w, 0));
+
+  // Za mało / za dużo: odchylenie od graczy z tej rangi na tym bohaterze.
+  const checks = [
+    ['Souls', end.net_worth, at('net_worth'), 1], ['Kills', end.kills, at('kills'), 1], ['Assists', end.assists, at('assists'), 1],
+    ['Deaths', end.deaths, at('deaths'), -1], ['Hero damage', end.player_damage, at('player_damage'), 1],
+    ['Objective damage', end.boss_damage, at('boss_damage'), 1], ['Last hits', end.creep_kills, at('creep_kills'), 1],
+    ['Jungle camps', end.neutral_kills, at('neutral_kills'), 1], ['Healing', end.player_healing, at('player_healing'), 1],
+    ['Souls lost on death', end.gold_death_loss, at('gold_death_loss'), -1],
+  ].filter(c => c[2]).map(([name, v, c, dir]) => ({ name, v, avg: c.avg, z: (v - c.avg) / c.std, dir }));
+  const low = checks.filter(c => c.z * c.dir < -.7).sort((a, b) => a.z * a.dir - b.z * b.dir);
+  const high = checks.filter(c => c.z * c.dir > .7).sort((a, b) => b.z * b.dir - a.z * a.dir);
+  return { score, parts, checks, low, high, opps, coreRows, end, won: me.team === meta.winning_team };
+}
+
+// "Uczenie się": powtarzające się słabości w ostatnich meczach na tym bohaterze (z historii, bez zapisywania).
+function trends(d) {
+  const same = d.list.filter(m => m.hero_id === d.me.hero_id).slice(0, 15);
+  if (same.length < 3) return null;
+  const c = k => curveAt(d.curveAll, 100, k);
+  const flag = (k, val, dir) => same.filter(m => { const cv = c(k); return cv && (val(m) - cv.avg) / cv.std * dir < -.5; }).length;
+  return {
+    n: same.length,
+    deaths: flag('deaths', m => m.player_deaths, -1),
+    farm: flag('net_worth', m => m.net_worth, 1),
+    kills: flag('kills', m => m.player_kills + m.player_assists, 1),
+    wins: same.filter(m => m.match_result === m.player_team).length,
+  };
+}
+
+async function renderSummaryPage() {
+  document.body.classList.add('summary');
+  const out = $('out');
+  const params = new URLSearchParams(location.search);
+  let acc = toAccount(params.get('acc') || store.get('dl-acc') || '');
+  const askAcc = msg => {
+    out.innerHTML = `<div class="empty"><b>Match summary</b>${msg || 'Enter your Steam account ID or SteamID64 to see your latest match.'}` +
+      `<form id="accform" style="margin-top:16px;display:flex;gap:8px;justify-content:center"><input class="search" style="max-width:260px;margin:0" name="acc" placeholder="e.g. 894049347" value="${esc(acc)}"><button class="vs" style="padding:6px 14px">Show</button></form></div>`;
+    $('accform').addEventListener('submit', e => { e.preventDefault(); const v = toAccount(new FormData(e.target).get('acc')); if (v) { store.set('dl-acc', v); location.search = '?summary=1&acc=' + v; } });
+  };
+  if (!acc) return askAcc();
+  store.set('dl-acc', acc);
+  out.innerHTML = '<div class="skeleton"><div></div><div></div><div></div></div>';
+  let d;
+  try { d = await loadSummary(acc, params.get('match')); }
+  catch (e) { return askAcc(`Could not load the match: ${esc(e.message)} New matches appear here a few minutes after they end.`); }
+  const a = analyzeMatch(d), t = trends(d), hero = heroById(d.me.hero_id) || { name: 'Hero ' + d.me.hero_id, img: '', card: '', bg: '' };
+  const grade = a.score >= 80 ? 'Excellent' : a.score >= 65 ? 'Good' : a.score >= 45 ? 'Average' : a.score >= 30 ? 'Below average' : 'Rough game';
+  const ring = `<svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" class="ring-bg"/><circle cx="60" cy="60" r="52" class="ring-fg" style="stroke-dasharray:${(a.score / 100 * 326.7).toFixed(1)} 326.7"/><text x="60" y="66" text-anchor="middle">${a.score}</text></svg>`;
+
+  let html = `<div class="banner">${hero.bg ? `<div class="bg" style="background-image:url('${esc(encodeURI(hero.bg))}')"></div>` : ''}` +
+    (hero.card ? `<img class="card" src="${esc(hero.card)}" alt="">` : '') +
+    `<div style="flex:1"><div class="kicker">Match ${esc(d.row.match_id)} · ${a.won ? 'Victory' : 'Defeat'} · ${mmss(d.dur)}</div><h2>${esc(hero.name)}</h2><div class="stats">` +
+    `<span class="stat"><b>${a.end.kills}/${a.end.deaths}/${a.end.assists}</b>KDA</span><span class="stat"><b>${num(a.end.net_worth)}</b>souls</span>` +
+    `<span class="stat"><b>${num(a.end.player_damage)}</b>damage</span>` + (d.row.ranked_delta ? `<span class="stat"><b>${d.row.ranked_delta > 0 ? '+' : ''}${d.row.ranked_delta}</b>rank progress</span>` : '') +
+    `</div></div><div class="scorebox">${ring}<b>${grade}</b><span>vs ${RANK_LABELS[badge]} ${esc(hero.name)} players</span></div></div>`;
+
+  html += `<div class="block"><div class="label">Souls over time</div>${soulsChart(d.me, d.dur, d.curve, a.opps)}` +
+    `<div class="legend" style="margin-top:6px"><span><i style="background:var(--gold)"></i>You</span><span><i style="background:#93a39b"></i>${RANK_LABELS[badge]} average (band = typical range)</span>` +
+    (a.opps.length ? `<span><i style="background:var(--enemy)"></i>Lane opponent${a.opps.length > 1 ? 's' : ''}: ${a.opps.map(o => esc(heroById(o.hero_id)?.name || '?')).join(', ')}</span>` : '') + '</div></div>';
+
+  html += '<div class="block"><div class="label">Score breakdown</div><div class="parts">' + a.parts.map(p =>
+    `<div class="part"><div class="top"><b>${p.key}</b><span class="${p.v >= 60 ? 'pos' : p.v < 40 ? 'neg' : ''}">${p.v}</span></div><div class="meter"><i class="to" style="width:${p.v}%;background:${p.v >= 60 ? 'var(--good)' : p.v < 40 ? 'var(--bad)' : 'var(--gold)'}"></i></div><div class="g">${esc(p.note)}</div></div>`).join('') + '</div></div>';
+
+  const lineOf = c => `<div class="chk"><b>${esc(c.name)}</b><span>${num(Math.round(c.v))} <em>vs ${num(Math.round(c.avg))} avg</em></span></div>`;
+  html += '<div class="block"><div class="twocol">' +
+    `<div><div class="label">Too little</div>${a.low.length ? a.low.map(lineOf).join('') : '<p class="hint">Nothing clearly below the rank average.</p>'}</div>` +
+    `<div><div class="label">Too much / strong</div>${a.high.length ? a.high.map(c => lineOf(c)).join('') : '<p class="hint">Nothing clearly above the rank average.</p>'}</div>` +
+    '</div></div>';
+
+  if (a.coreRows.length) html += '<div class="block"><div class="label">Core items</div><div class="cores">' + a.coreRows.map(r =>
+    `<div class="core ${r.at === undefined ? 'miss' : r.at - r.avg > 120 ? 'late' : 'ok'}" title="${esc(r.it.name)}"><img src="${esc(r.it.img)}" alt=""><b>${esc(r.it.name)}</b><span>${r.at === undefined ? 'not bought' : mmss(r.at) + ' (avg ' + mmss(r.avg) + ')'}</span></div>`).join('') + '</div></div>';
+
+  if (t) {
+    const tips = [];
+    if (t.deaths / t.n >= .5) tips.push(`You died more than typical in <b>${t.deaths} of your last ${t.n}</b> ${esc(hero.name)} games. The in-game list now moves a defensive counter forward for this hero.`);
+    if (t.farm / t.n >= .5) tips.push(`Your souls were below typical in <b>${t.farm} of ${t.n}</b> games — focus on last hits and jungle camps between fights.`);
+    if (t.kills / t.n >= .5) tips.push(`Low kill participation in <b>${t.kills} of ${t.n}</b> games — group up with your team more for fights.`);
+    html += `<div class="block"><div class="label">Your trends on ${esc(hero.name)}</div><p class="hint">Last ${t.n} games: ${t.wins} wins.</p>` +
+      (tips.length ? tips.map(x => `<p class="note" style="border:1px solid var(--line);border-radius:8px;margin:0 0 8px">${x}</p>`).join('') : '<p class="hint">No recurring weakness — keep it up.</p>') + '</div>';
+    store.set('dl-trend-' + acc + '-' + d.me.hero_id, { dieOften: t.deaths / t.n >= .5, at: Date.now() });
+  }
+
+  const others = d.list.slice(0, 8).map(m => `<a class="vs" href="?summary=1&acc=${acc}&match=${m.match_id}" style="text-decoration:none;color:inherit"><img src="${esc(heroById(m.hero_id)?.img || '')}" alt=""><div><div class="n">${esc(heroById(m.hero_id)?.name || '?')}</div><div class="g">${m.player_kills}/${m.player_deaths}/${m.player_assists} · ${m.match_result === m.player_team ? 'W' : 'L'}</div></div></a>`).join('');
+  html += `<div class="block"><div class="label">Recent matches</div><div class="versus">${others}</div></div>`;
+  out.innerHTML = html;
+}
+// ---------- profil gracza (?profile=1&acc=…) ----------
+// Dowolny gracz: wyszukiwanie po nicku Steam lub numerze konta. Statystyki postaci z deadlock-api
+// (players/hero-stats), historia meczów (players/…/match-history), ranga i nazwa ze Steam.
+let rankNames = null;
+async function loadRanks() {
+  if (rankNames) return rankNames;
+  try { const r = await getJSON(`${API}/assets/ranks`); rankNames = new Map(r.map(x => [x.tier, x])); } catch (e) { rankNames = new Map(); }
+  return rankNames;
+}
+const rankLabel = (ranks, badge) => {
+  if (!badge) return 'Unranked';
+  const tier = Math.floor(badge / 10), sub = badge % 10, r = ranks.get(tier);
+  return (r ? r.name : 'Tier ' + tier) + (sub ? ' ' + sub : '');
+};
+const rankImg = (ranks, badge) => { const r = ranks.get(Math.floor((badge || 0) / 10)); const im = r && r.images; return im ? (im['small_subrank' + (badge % 10) + '_webp'] || im.small_webp || im.large_webp || '') : ''; };
+
+function searchBox(value) {
+  return `<form id="psearch" class="psearch"><input class="search" name="q" placeholder="Steam name, account ID or SteamID64" value="${esc(value || '')}"><button class="vs">Search</button></form><div id="presults"></div>`;
+}
+function wireSearch() {
+  const f = $('psearch'); if (!f) return;
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    const q = String(new FormData(f).get('q') || '').trim();
+    if (/^\d+$/.test(q)) { location.search = '?profile=1&acc=' + toAccount(q); return; }
+    $('presults').innerHTML = '<p class="hint">Searching…</p>';
+    try {
+      const r = await getJSON(`${API}/players/steam-search?search_query=${encodeURIComponent(q)}&limit=10`);
+      $('presults').innerHTML = r.length ? '<div class="versus" style="margin-top:10px">' + r.map(p =>
+        `<a class="vs" href="?profile=1&acc=${p.account_id}" style="text-decoration:none;color:inherit"><img src="${esc(p.avatarmedium || p.avatar || '')}" alt=""><div><div class="n">${esc(p.personaname)}</div><div class="g">${p.account_id}</div></div></a>`).join('') + '</div>'
+        : '<p class="hint">No players found.</p>';
+    } catch (err) { $('presults').innerHTML = `<p class="note err">${esc(err.message)}</p>`; }
+  });
+}
+
+async function renderProfilePage() {
+  document.body.classList.add('summary');
+  const out = $('out'), params = new URLSearchParams(location.search);
+  const acc = toAccount(params.get('acc') || store.get('dl-acc') || '');
+  if (!acc) { out.innerHTML = `<div class="empty"><b>Player profile</b>Find any player by Steam name or account ID.${searchBox()}</div>`; wireSearch(); return; }
+  out.innerHTML = '<div class="skeleton"><div></div><div></div><div></div></div>';
+  let steam, rank, heroStats, hist, ranks;
+  try {
+    [steam, rank, heroStats, hist, ranks] = await Promise.all([
+      getJSON(`${API}/players/steam?account_ids=${acc}`).catch(() => []),
+      getJSON(`${API}/players/${acc}/rank`).catch(() => null),
+      getJSON(`${API}/players/hero-stats?account_ids=${acc}`),
+      getJSON(`${API}/players/${acc}/match-history`),
+      loadRanks(),
+    ]);
+  } catch (e) { out.innerHTML = `<div class="empty err"><b>Could not load this player</b>${esc(e.message)}${searchBox()}</div>`; wireSearch(); return; }
+  const p = (steam && steam[0]) || { personaname: 'Player ' + acc };
+  const list = Array.isArray(hist) ? hist : hist.matches || [];
+  const hs = heroStats.filter(h => h.matches_played > 0).sort((a, b) => b.matches_played - a.matches_played);
+  const tot = hs.reduce((s, h) => ({ m: s.m + h.matches_played, w: s.w + h.wins, k: s.k + h.kills, d: s.d + h.deaths, a: s.a + h.assists, t: s.t + h.time_played,
+    dmg: s.dmg + h.damage_per_min * h.time_played / 60, nw: s.nw + h.networth_per_min * h.time_played / 60 }), { m: 0, w: 0, k: 0, d: 0, a: 0, t: 0, dmg: 0, nw: 0 });
+  const per = v => tot.m ? v / tot.m : 0, perMin = v => tot.t ? v / (tot.t / 60) : 0;
+  const recent = list.slice(0, 20), rw = recent.filter(m => m.match_result === m.player_team).length;
+  const ago = s => { const h = (Date.now() / 1000 - s) / 3600; return h < 1 ? 'just now' : h < 24 ? Math.round(h) + 'h ago' : Math.round(h / 24) + 'd ago'; };
+
+  let html = `<div class="banner"><img class="card" style="width:96px;height:96px;border-radius:12px" src="${esc(p.avatarfull || p.avatarmedium || '')}" alt="">` +
+    `<div style="flex:1"><div class="kicker">Player profile · ${acc}</div><h2>${esc(p.personaname)}</h2><div class="stats">` +
+    `<span class="stat"><b>${num(tot.m)}</b>games</span><span class="stat"><b>${tot.m ? (tot.w / tot.m * 100).toFixed(1) : '0'}%</b>win rate</span>` +
+    `<span class="stat"><b>${per(tot.k).toFixed(1)}/${per(tot.d).toFixed(1)}/${per(tot.a).toFixed(1)}</b>avg KDA</span>` +
+    `<span class="stat"><b>${num(Math.round(perMin(tot.dmg)))}</b>dmg/min</span><span class="stat"><b>${num(Math.round(perMin(tot.nw)))}</b>souls/min</span>` +
+    `<span class="stat"><b>${recent.length ? rw + '-' + (recent.length - rw) : '–'}</b>last ${recent.length}</span>` +
+    `</div></div>${rank && rank.badge ? `<div class="scorebox">${rankImg(ranks, rank.badge) ? `<img src="${esc(rankImg(ranks, rank.badge))}" alt="" style="width:84px;height:84px;object-fit:contain">` : ''}<b>${esc(rankLabel(ranks, rank.badge))}</b><span>current rank</span></div>` : ''}</div>`;
+
+  html += `<div class="block"><div class="label">Heroes</div><div class="htable"><div class="hrow head"><span>Hero</span><span>Games</span><span>Win rate</span><span>KDA</span><span>Dmg/min</span><span>Souls/min</span><span>Last played</span></div>` +
+    hs.map(h => {
+      const hero = heroById(h.hero_id), wr = h.wins / h.matches_played * 100;
+      return `<a class="hrow" href="./?acc=${acc}#hero=${h.hero_id}" title="Open the build page for ${esc(hero?.name || '')}"><span class="hn"><img src="${esc(hero?.img || '')}" alt="">${esc(hero?.name || 'Hero ' + h.hero_id)}</span>` +
+        `<span>${h.matches_played}<i class="bar" style="width:${Math.round(h.matches_played / hs[0].matches_played * 100)}%"></i></span>` +
+        `<span class="${wr >= 55 ? 'pos' : wr < 45 ? 'neg' : ''}">${wr.toFixed(0)}%</span>` +
+        `<span>${(h.kills / h.matches_played).toFixed(1)}/${(h.deaths / h.matches_played).toFixed(1)}/${(h.assists / h.matches_played).toFixed(1)}</span>` +
+        `<span>${num(Math.round(h.damage_per_min))}</span><span>${num(Math.round(h.networth_per_min))}</span><span>${ago(h.last_played)}</span></a>`;
+    }).join('') + '</div></div>';
+
+  html += `<div class="block"><div class="label">Match history</div><div class="htable mh"><div class="hrow head"><span>Hero</span><span>Result</span><span>KDA</span><span>Souls</span><span>Length</span><span>When</span><span></span></div>` +
+    list.slice(0, 30).map(m => {
+      const hero = heroById(m.hero_id), won = m.match_result === m.player_team;
+      return `<a class="hrow" href="?summary=1&acc=${acc}&match=${m.match_id}"><span class="hn"><img src="${esc(hero?.img || '')}" alt="">${esc(hero?.name || '?')}</span>` +
+        `<span class="${won ? 'pos' : 'neg'}">${won ? 'Win' : 'Loss'}${m.ranked_delta ? ` <em>${m.ranked_delta > 0 ? '+' : ''}${m.ranked_delta}</em>` : ''}</span>` +
+        `<span>${m.player_kills}/${m.player_deaths}/${m.player_assists}</span><span>${num(m.net_worth)}</span><span>${mmss(m.match_duration_s)}</span><span>${ago(m.start_time)}</span><span class="go">Summary ›</span></a>`;
+    }).join('') + '</div></div>';
+
+  html += `<div class="block"><div class="label">Look up another player</div>${searchBox()}</div>`;
+  out.innerHTML = html;
+  wireSearch();
+  store.set('dl-acc', acc);
+}
 const pp = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + ' pp';
 const pct = v => Math.round(v * 100) + '%';
 const num = v => (v ?? 0).toLocaleString('en-US');
@@ -599,7 +932,8 @@ function effCost(it) {
 
 // Przy pełnym ekwipunku nie ma sensu wymieniać czegoś na tani item z początku gry: pomijamy
 // niekupione itemy do 1600 dusz, chyba że są ulepszeniem czegoś, co gracz już ma.
-const inventoryFull = () => !!live.ownedRaw && live.cap >= 8 && live.ownedRaw.size >= live.cap;
+// Liczymy tylko przedmioty ze sklepu (bez składników zużytych w ulepszeniach — tych nie ma w inv).
+const inventoryFull = () => !!live.ownedRaw && live.cap >= 4 && live.ownedRaw.size >= live.cap;
 function skipWhenFull(it) {
   if (!inventoryFull() || (it.cost || 0) > 1600) return false;
   return !(it.comps || []).some(c => { const ci = [...items.values()].find(x => x.cls === c); return ci && live.ownedRaw.has(normName(ci.name)); });
@@ -611,7 +945,7 @@ function nextRow(a) { let n = 0; for (const ph of a.phases) for (const r of ph) 
 // najczęściej sprzedają (przy remisie tańszy), z pominięciem składników planowanych ulepszeń.
 // Nic nie podpowiadamy, gdy następny zakup jest ulepszeniem posiadanego itemu — wtedy slot się nie zmienia.
 function sellPick(a) {
-  if (!live.ownedRaw || live.cap < 8 || live.ownedRaw.size < live.cap) return null;
+  if (!inventoryFull()) return null;
   const next = nextRow(a);
   if (!next) return null;
   const byCls = new Map([...items.values()].map(i => [i.cls, i]));
@@ -713,6 +1047,11 @@ function publishList(a) {
   for (const r of a.counters) {
     if (out.length >= 12 || isOwned(r.it) || out.some(x => x[0] === r.it.name)) continue;
     out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), 'C', (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, ''), reason(r)]);
+  }
+  const tr = live.acc && slots[0] ? store.get('dl-trend-' + live.acc + '-' + slots[0]) : null;
+  if (tr && tr.dieOften && Date.now() - tr.at < 30 * 86400e3) {
+    const di = out.findIndex((x, i) => i > 1 && DEFENSIVE.includes(normName(x[0])));
+    if (di > 1) { const [d] = out.splice(di, 1); d[5] = 'You often die a lot on this hero (from your recent match summaries). ' + d[5]; out.splice(1, 0, d); }
   }
   const json = JSON.stringify(out);
   if (json === lastList) return;
@@ -872,8 +1211,8 @@ function applyOverlay() {
   live.souls = new Map();
   enemyNames.forEach((n, i) => { const id = find(n), s = parseSouls(enemySouls[i]); if (id && s) live.souls.set(id, s); });
   live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(normName)) : null;
-  live.ownedRaw = live.owned ? new Set(live.owned) : null;
-  live.cap = parseInt(params.get('cap'), 10) || 0;
+  live.ownedRaw = params.has('inv') ? new Set(params.get('inv').split('|').filter(Boolean).map(normName)) : live.owned ? new Set(live.owned) : null;
+  live.cap = parseInt(params.get('cap'), 10) || 12;
   if (live.owned) {
     // Kupiony ulepszony item zawiera swoje składniki — sklep nie pokazuje ich już jako posiadanych.
     const byCls = new Map(), byName = new Map();
@@ -911,6 +1250,18 @@ window.__cbUpdate = q => {
   try {
     const a = await loadAssets();
     heroes = a.heroes; items = new Map(a.items.map(i => [i.id, i]));
+    const qp = new URLSearchParams(location.search), view = qp.has('summary') ? 'summary' : qp.has('profile') ? 'profile' : 'build';
+    for (const n of document.querySelectorAll('[data-nav]')) n.classList.toggle('on', n.dataset.nav === view);
+    const acc0 = toAccount(qp.get('acc') || store.get('dl-acc') || '');
+    if (acc0) for (const n of document.querySelectorAll('[data-nav]')) if (n.dataset.nav !== 'build') n.href = '?' + n.dataset.nav + '=1&acc=' + acc0;
+    if (view !== 'build') {
+      const savedBadge0 = store.get('dl-badge');
+      if (typeof savedBadge0 === 'string' && savedBadge0 in RANK_LABELS) { badge = savedBadge0; for (const x of $('ranks').children) x.classList.toggle('on', x.dataset.badge === badge); }
+      if (view === 'profile') $('ranks').style.display = 'none';
+      return view === 'summary' ? renderSummaryPage() : renderProfilePage();
+    }
+    // Z profilu: #hero=ID otwiera build tego bohatera.
+    const heroFromHash = +(new URLSearchParams(location.hash.slice(1)).get('hero') || 0);
     abilities = new Map((a.abilities || []).map(x => [x.id, x]));
     // Na zwykłej stronie konto można podać w adresie (?acc=…), żeby podpowiedź obejmowała tylko własnych bohaterów.
     if (!OVERLAY) live.acc = (new URLSearchParams(location.search).get('acc') || '').replace(/[^0-9]/g, '');
@@ -920,6 +1271,7 @@ window.__cbUpdate = q => {
     } else {
       const saved = store.get('dl-slots');
       if (Array.isArray(saved) && saved.length === 7) slots = saved.map(id => heroById(id) ? id : null);
+      if (heroById(heroFromHash)) slots[0] = heroFromHash;
     }
     const savedBadge = store.get('dl-badge');
     if (typeof savedBadge === 'string' && savedBadge in RANK_LABELS) {
