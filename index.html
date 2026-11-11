@@ -177,6 +177,7 @@
   .vs .rank { font: 700 13px var(--cond); color: var(--gold); width: 16px; text-align: center; }
 
   /* ---------- stan meczu: kupione itemy, nakarmieni wrogowie, umiejętności ---------- */
+  .tile .cost s { opacity: .6; margin-left: 4px; font-size: .85em; }
   .tile.owned { opacity: .42; filter: saturate(.35); }
   .tile.owned .num { background: var(--good); color: #10200a; border-color: var(--good); }
   .tile.next { box-shadow: 0 0 0 3px var(--gold), 0 0 22px -2px rgba(232,185,100,.8); }
@@ -300,7 +301,7 @@ let overlayQuery = location.search || (String(window.name).startsWith('?overlay'
 const OVERLAY = new URLSearchParams(overlayQuery).has('overlay');
 let overlayAllies = [];
 // Stan meczu przekazywany przez moda: dusze wrogów, kupione itemy, konto gracza (do puli jego bohaterów).
-const live = { souls: new Map(), owned: null, lane: new Set(), acc: '', pool: null, poolLoading: false };
+const live = { souls: new Map(), owned: null, ownedRaw: null, cap: 0, lane: new Set(), acc: '', pool: null, poolLoading: false };
 const normName = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 if (OVERLAY) document.title = 'CB|boot';
 const statsCache = new Map(); // "hero|badge" -> dane
@@ -548,7 +549,7 @@ function analyze(me, base, meta, vs, enemies, long) {
       late = true;
     }
     rows.push({ it, p0, late, p: Math.min(1, Math.max(0, p)), wr: r.matches ? r.wins / r.matches : 0,
-      n: r.matches, t: r.avg_buy_time_s, up, down, vsList });
+      n: r.matches, sellRate: r.matches ? (r.sold || 0) / r.matches : 0, t: r.avg_buy_time_s, up, down, vsList });
   }
   const phases = PHASES.map((ph, i) => {
     const min = i ? PHASES[i - 1].max : 0;
@@ -558,7 +559,7 @@ function analyze(me, base, meta, vs, enemies, long) {
   });
   const counters = rows.filter(r => r.up > 0 && r.p >= .05).sort((a, b) => b.up - a.up).slice(0, 8);
   const avoid = rows.filter(r => r.down < 0 && r.up === 0 && r.p0 >= .12).sort((a, b) => a.down - b.down).slice(0, 4);
-  return { G, wr0, en, phases, counters, avoid };
+  return { G, wr0, en, phases, counters, avoid, rows };
 }
 
 const pp = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + ' pp';
@@ -583,6 +584,50 @@ function enemyWeights(enemies) {
 }
 
 const isOwned = it => !!live.owned && live.owned.has(normName(it.name));
+
+// Faktyczna cena: gra odlicza koszt składników, które gracz ma w ekwipunku (np. 6400 → 4800).
+// Liczą się tylko itemy fizycznie posiadane (ownedRaw), nie te już zużyte w innym ulepszeniu.
+function effCost(it) {
+  let cost = it.cost || 0;
+  if (!live.ownedRaw) return cost;
+  for (const c of it.comps || []) {
+    const ci = [...items.values()].find(x => x.cls === c);
+    if (ci && live.ownedRaw.has(normName(ci.name))) cost -= ci.cost || 0;
+  }
+  return Math.max(0, cost);
+}
+
+// Przy pełnym ekwipunku nie ma sensu wymieniać czegoś na tani item z początku gry: pomijamy
+// niekupione itemy do 1600 dusz, chyba że są ulepszeniem czegoś, co gracz już ma.
+const inventoryFull = () => !!live.ownedRaw && live.cap >= 8 && live.ownedRaw.size >= live.cap;
+function skipWhenFull(it) {
+  if (!inventoryFull() || (it.cost || 0) > 1600) return false;
+  return !(it.comps || []).some(c => { const ci = [...items.values()].find(x => x.cls === c); return ci && live.ownedRaw.has(normName(ci.name)); });
+}
+
+function nextRow(a) { let n = 0; for (const ph of a.phases) for (const r of ph) { n++; if (n === nextStep) return r; } return null; }
+
+// Pełny ekwipunek: który posiadany item sprzedać pod następny zakup. Wybieramy ten, który gracze
+// najczęściej sprzedają (przy remisie tańszy), z pominięciem składników planowanych ulepszeń.
+// Nic nie podpowiadamy, gdy następny zakup jest ulepszeniem posiadanego itemu — wtedy slot się nie zmienia.
+function sellPick(a) {
+  if (!live.ownedRaw || live.cap < 8 || live.ownedRaw.size < live.cap) return null;
+  const next = nextRow(a);
+  if (!next) return null;
+  const byCls = new Map([...items.values()].map(i => [i.cls, i]));
+  const has = cls => { const ci = byCls.get(cls); return !!ci && live.ownedRaw.has(normName(ci.name)); };
+  if ((next.it.comps || []).some(has)) return null;
+  const planned = new Set();
+  for (const ph of a.phases) for (const r of ph) if (!isOwned(r.it)) for (const c of r.it.comps || []) planned.add(c);
+  let best = null;
+  for (const it of items.values()) {
+    if (!live.ownedRaw.has(normName(it.name)) || planned.has(it.cls)) continue;
+    const row = a.rows.find(r => r.it.id === it.id);
+    const score = (row ? row.sellRate : .5) * 100000 - (it.cost || 0);
+    if (!best || score > best.score) best = { it, score };
+  }
+  return best ? best.it : null;
+}
 let nextStep = 0; // numer pierwszego niekupionego itemu w kolejności (0 = nie wiemy, co gracz ma)
 
 // Do czego służy item — krótkie uzasadnienie przy kontrach. Tylko itemy o jasnej, obronnej lub kontrującej roli.
@@ -623,7 +668,7 @@ function itemTile(r, step) {
     (next ? '<span class="flag buy">BUY</span>' : boosted && step && !owned ? '<span class="flag">COUNTER</span>' : '') +
     `<div class="art">${it.img ? `<img src="${esc(it.img)}" alt="" loading="lazy">` : ''}</div>` +
     `<div class="plate">${esc(it.name)}</div><div class="rate"><i style="width:${Math.round(r.p * 100)}%"></i></div>` +
-    `<div class="foot"><span class="cost">${num(it.cost)}</span><span class="pct">${pct(r.p)}</span></div></div>`;
+    `<div class="foot"><span class="cost">${effCost(it) < (it.cost || 0) ? `${num(effCost(it))}<s>${num(it.cost)}</s>` : num(it.cost)}</span><span class="pct">${pct(r.p)}</span></div></div>`;
 }
 
 function counterCard(r, mode) {
@@ -652,21 +697,22 @@ function reason(r) {
   const vs = r.vsList.filter(v => v.z > 0).slice(0, 2).map(v => `${heroById(v.id)?.name} (${pct(v.pE)}, usually ${pct(v.p0)})`);
   if (vs.length) parts.push('Bought more often against ' + vs.join(' and ') + '.');
   else parts.push(`Bought in ${pct(r.p)} of ${r.late ? 'long games' : 'games'}${r.p >= .6 ? ' — a core item' : ''}.`);
-  return parts.join(' ').slice(0, 190);
+  if (effCost(r.it) < (r.it.cost || 0)) parts.push(`Costs ${num(effCost(r.it))} instead of ${num(r.it.cost)} because you own a component.`);
+  return parts.join(' ').slice(0, 230);
 }
 function publishList(a) {
-  const out = [];
+  const out = [], sell = sellPick(a);
   let n = 0;
   for (const ph of a.phases) for (const r of ph) {
     n++;
-    if (isOwned(r.it) || out.length >= 10) continue;
+    if (isOwned(r.it) || skipWhenFull(r.it) || out.length >= 10) continue;
     const icon = (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
-    out.push([r.it.name, (r.it.slot || '')[0] || '', r.it.cost || 0, n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r)]);
+    out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r), n === nextStep && sell ? sell.name : '']);
   }
   // Kontry spoza kolejności (np. sytuacyjne) też trafiają na listę, na końcu.
   for (const r of a.counters) {
     if (out.length >= 12 || isOwned(r.it) || out.some(x => x[0] === r.it.name)) continue;
-    out.push([r.it.name, (r.it.slot || '')[0] || '', r.it.cost || 0, 'C', (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, ''), reason(r)]);
+    out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), 'C', (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, ''), reason(r)]);
   }
   const json = JSON.stringify(out);
   if (json === lastList) return;
@@ -784,9 +830,10 @@ function renderResult(entry) {
 
   // Pierwszy niekupiony item w kolejności dostaje znacznik "KUP" (tylko gdy mod podał, co gracz ma).
   nextStep = 0;
-  if (live.owned) { let n = 0; for (const ph of a.phases) for (const r of ph) { n++; if (!nextStep && !isOwned(r.it)) nextStep = n; } }
+  if (live.owned) { let n = 0; for (const ph of a.phases) for (const r of ph) { n++; if (!nextStep && !isOwned(r.it) && !skipWhenFull(r.it)) nextStep = n; } }
 
   html += '<div class="block"><div class="label">Buy order</div>' +
+    (() => { const sell = sellPick(a), next = nextRow(a); return sell && next ? `<p class="note warn" style="margin:0 0 10px;border:1px solid var(--line);border-radius:8px">Inventory full (${live.ownedRaw.size}/${live.cap}): sell <b>${esc(sell.name)}</b> to make room for <b>${esc(next.it.name)}</b>.</p>` : ''; })() +
     '<div class="legend"><span>Buy left to right.</span>' +
     '<span><i style="background:var(--weapon)"></i>Weapon</span><span><i style="background:var(--vitality)"></i>Vitality</span><span><i style="background:var(--spirit)"></i>Spirit</span>' +
     '<span>Percent = share of games where players buy the item (after minute 20: of games longer than 35 minutes).</span>' +
@@ -794,10 +841,10 @@ function renderResult(entry) {
   let step = 0;
   PHASES.forEach((p, i) => {
     if (!a.phases[i].length) return;
-    const sum = a.phases[i].reduce((s, r) => s + (r.it.cost || 0), 0);
+    const sum = a.phases[i].reduce((s, r) => s + (isOwned(r.it) ? 0 : effCost(r.it)), 0);
     const laneNames = i === 0 ? enemies.filter(id => live.lane.has(id)).map(id => heroById(id)?.name).filter(Boolean) : [];
     const sub = laneNames.length ? 'for your lane: ' + laneNames.join(', ') : p.sub;
-    html += `<div class="phase"><div class="phase-head"><b>${p.name}</b><span>${esc(sub)}</span><span class="sum">${num(sum)} souls</span></div><div class="flow">` +
+    html += `<div class="phase"><div class="phase-head"><b>${p.name}</b><span>${esc(sub)}</span><span class="sum">${num(sum)} souls${live.owned ? ' left' : ''}</span></div><div class="flow">` +
       a.phases[i].map(r => itemTile(r, ++step)).join('') + '</div></div>';
   });
   html += '</div>';
@@ -825,6 +872,8 @@ function applyOverlay() {
   live.souls = new Map();
   enemyNames.forEach((n, i) => { const id = find(n), s = parseSouls(enemySouls[i]); if (id && s) live.souls.set(id, s); });
   live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(normName)) : null;
+  live.ownedRaw = live.owned ? new Set(live.owned) : null;
+  live.cap = parseInt(params.get('cap'), 10) || 0;
   if (live.owned) {
     // Kupiony ulepszony item zawiera swoje składniki — sklep nie pokazuje ich już jako posiadanych.
     const byCls = new Map(), byName = new Map();
