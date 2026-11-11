@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -83,7 +83,7 @@
   .hero.me { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
   .hero.enemy { border-color: var(--enemy); box-shadow: inset 0 0 0 1px var(--enemy); }
   .hero.me::after, .hero.enemy::after { position: absolute; top: 2px; left: 2px; padding: 0 4px; border-radius: 3px; font: 700 9px var(--cond); letter-spacing: .5px; }
-  .hero.me::after { content: "TY"; background: var(--gold); color: #1b1408; }
+  .hero.me::after { content: "YOU"; background: var(--gold); color: #1b1408; }
   .hero.enemy::after { content: "VS"; background: var(--enemy); color: #fff; }
 
   /* ---------- wynik ---------- */
@@ -252,37 +252,37 @@
     <div class="mark"><i></i></div>
     <div>
       <h1>Deadlock <em>Counter-Build</em></h1>
-      <p>Wybierz bohatera i skład wroga — zobaczysz, co w takim meczu kupują najlepsi gracze.</p>
+      <p>Pick your hero and the enemy team to see what top players buy in that matchup.</p>
     </div>
   </div>
-  <div class="ranks" id="ranks" role="group" aria-label="Zakres rang">
+  <div class="ranks" id="ranks" role="group" aria-label="Rank range">
     <button data-badge="110" class="on">Eternus</button>
     <button data-badge="100">Ascendant+</button>
     <button data-badge="80">Oracle+</button>
-    <button data-badge="">Wszyscy</button>
+    <button data-badge="">All ranks</button>
   </div>
 </header>
 <main>
   <section class="panel picker">
-    <div class="label">Skład</div>
+    <div class="label">Lineup</div>
     <div class="lineup" id="slots"></div>
-    <input type="search" class="search" id="search" placeholder="Szukaj bohatera…" aria-label="Szukaj bohatera">
+    <input type="search" class="search" id="search" placeholder="Search hero…" aria-label="Search hero">
     <div class="grid" id="grid"></div>
   </section>
   <section class="panel" id="out"><div class="skeleton"><div></div><div></div><div></div></div></section>
 </main>
 <footer>
-  Dane: <a href="https://deadlock-api.com/" target="_blank" rel="noopener">deadlock-api.com</a> (pobierane na żywo przy każdym otwarciu: mecze z ostatnich 14 dni albo od ostatniego patcha).
-  Nieoficjalne narzędzie, niepowiązane z Valve. Build pokazuje, co faktycznie kupują gracze z wybranej rangi — traktuj go jako podpowiedź.
+  Data: <a href="https://deadlock-api.com/" target="_blank" rel="noopener">deadlock-api.com</a> (fetched live on every visit: matches from the last 14 days or since the latest patch).
+  Unofficial tool, not affiliated with Valve. The build shows what players at the selected rank actually buy — treat it as a suggestion.
 </footer>
 
 <script>
 const API = 'https://api.deadlock-api.com/v1';
 const PHASES = [
-  { name: 'Linia', sub: 'pierwsze ~9 minut', max: 540, take: 6 },
-  { name: 'Środek gry', sub: '9–20 minuta', max: 1200, take: 7 },
-  { name: 'Późna gra', sub: '20–30 minuta', max: 1800, take: 6 },
-  { name: 'Koniec gry', sub: 'po 30 minucie, gdy mecz się przeciąga', max: Infinity, take: 6 },
+  { name: 'Lane', sub: 'first ~9 minutes', max: 540, take: 6 },
+  { name: 'Mid game', sub: 'minutes 9–20', max: 1200, take: 7 },
+  { name: 'Late game', sub: 'minutes 20–30', max: 1800, take: 6 },
+  { name: 'End game', sub: 'after minute 30, if the match drags on', max: Infinity, take: 6 },
 ];
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -307,8 +307,8 @@ const statsCache = new Map(); // "hero|badge" -> dane
 
 async function getJSON(url) {
   const r = await fetch(url);
-  if (!r.ok) throw new Error(r.status === 429 ? 'Za dużo zapytań — odczekaj minutę.' :
-    r.status >= 500 ? 'Serwer statystyk jest przeciążony (' + r.status + '). Spróbuj za chwilę.' : 'Błąd API ' + r.status);
+  if (!r.ok) throw new Error(r.status === 429 ? 'Too many requests — wait a minute.' :
+    r.status >= 500 ? 'The stats server is overloaded (' + r.status + '). Try again in a moment.' : 'API error ' + r.status);
   return r.json();
 }
 
@@ -341,7 +341,7 @@ function heroById(id) { return heroes.find(h => h.id === id); }
 function slotHtml(id, i) {
   const h = id && heroById(id);
   const cls = ['slot', i === 0 ? 'me' : 'enemy', h ? 'filled' : '', i === active ? 'active' : ''].join(' ');
-  const label = h ? h.name : i === 0 ? 'Ty' : 'Wróg ' + i;
+  const label = h ? h.name : i === 0 ? 'You' : 'Enemy ' + i;
   return `<button class="${cls}" data-slot="${i}" title="${esc(label)}">` +
     (h ? `<img src="${esc(i === 0 && h.card ? h.card : h.img)}" alt=""><span class="x" data-clear="${i}">×</span>` : '<span class="plus">+</span>') +
     `<span class="tag">${esc(label)}</span></button>`;
@@ -563,7 +563,7 @@ function analyze(me, base, meta, vs, enemies, long) {
 
 const pp = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + ' pp';
 const pct = v => Math.round(v * 100) + '%';
-const num = v => (v ?? 0).toLocaleString('pl-PL');
+const num = v => (v ?? 0).toLocaleString('en-US');
 
 // Dusze z górnego paska gry przychodzą jako tekst ("12.4k", "1,234").
 function parseSouls(s) {
@@ -572,7 +572,7 @@ function parseSouls(s) {
   const v = parseFloat(k ? s.replace(',', '.') : s.replace(/[^0-9]/g, ''));
   return isFinite(v) ? Math.round(k ? v * 1000 : v) : 0;
 }
-const fmtSouls = v => v >= 1000 ? (v / 1000).toFixed(1).replace('.', ',') + 'k' : String(v);
+const fmtSouls = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(v);
 
 // Waga wroga według jego dusz względem średniej drużyny: nakarmiony liczy się do 2×, biedny od 0,5×.
 // Działa dopiero, gdy średnia przekroczy 3000 dusz — wcześniej różnice nic nie znaczą.
@@ -587,40 +587,40 @@ let nextStep = 0; // numer pierwszego niekupionego itemu w kolejności (0 = nie 
 
 // Do czego służy item — krótkie uzasadnienie przy kontrach. Tylko itemy o jasnej, obronnej lub kontrującej roli.
 const WHY = {
-  healbane: 'Ogranicza leczenie wrogów, których trafiasz.',
-  toxicbullets: 'Pociski nakładają krwawienie i osłabiają leczenie celu.',
-  decay: 'Osłabia leczenie celu i zadaje obrażenia od jego zdrowia.',
-  metalskin: 'Na kilka sekund chroni przed pociskami.',
-  returnfire: 'Odbija część obrażeń od pocisków w atakującego.',
-  platedarmor: 'Zmniejsza obrażenia od pocisków.',
-  weaponshielding: 'Tarcza i odporność po otrzymaniu obrażeń od broni.',
-  spiritshielding: 'Tarcza i odporność po otrzymaniu obrażeń spirit.',
-  spiritresilience: 'Zmniejsza obrażenia spirit.',
-  reactivebarrier: 'Daje tarczę, gdy zostaniesz unieruchomiony lub ogłuszony.',
-  debuffreducer: 'Skraca efekty kontroli nakładane na ciebie.',
-  dispelmagic: 'Zdejmuje z ciebie negatywne efekty.',
-  unstoppable: 'Na chwilę uodparnia na ogłuszenia i inne efekty kontroli.',
-  counterspell: 'Blokuje wymierzoną w ciebie umiejętność wroga.',
-  knockdown: 'Ogłusza cel z opóźnieniem i strąca latających bohaterów.',
-  slowinghex: 'Spowalnia cel i blokuje jego umiejętności ruchu.',
-  disarminghex: 'Rozbraja cel, więc nie może strzelać.',
-  cursedrelic: 'Ucisza i rozbraja cel oraz blokuje jego itemy.',
-  etherealshift: 'Chwilowa nietykalność, żeby przeczekać burst.',
-  warpstone: 'Krótki teleport do ucieczki lub pościgu.',
-  inhibitor: 'Trafiony wróg zadaje mniej obrażeń.',
-  suppressor: 'Trafiony wróg strzela wolniej.',
-  tankbuster: 'Obrażenia od procentu zdrowia — na wytrzymałych wrogów.',
-  bulletresistshredder: 'Obniża odporność celu na pociski.',
-  mysticvulnerability: 'Obniża odporność celu na spirit.',
-  armorpiercingrounds: 'Pociski ignorują część odporności celu.',
+  healbane: 'Cuts healing on enemies you hit.',
+  toxicbullets: 'Bullets apply bleed and reduce the target\'s healing.',
+  decay: 'Reduces the target\'s healing and deals damage based on its health.',
+  metalskin: 'Blocks bullet damage for a few seconds.',
+  returnfire: 'Reflects part of incoming bullet damage at the attacker.',
+  platedarmor: 'Reduces bullet damage taken.',
+  weaponshielding: 'Shield and resistance after taking weapon damage.',
+  spiritshielding: 'Shield and resistance after taking spirit damage.',
+  spiritresilience: 'Reduces spirit damage taken.',
+  reactivebarrier: 'Grants a shield when you are stunned or immobilized.',
+  debuffreducer: 'Shortens crowd control applied to you.',
+  dispelmagic: 'Removes negative effects from you.',
+  unstoppable: 'Brief immunity to stuns and other crowd control.',
+  counterspell: 'Blocks an enemy ability aimed at you.',
+  knockdown: 'Stuns the target after a delay and grounds flying heroes.',
+  slowinghex: 'Slows the target and blocks its movement abilities.',
+  disarminghex: 'Disarms the target so it cannot shoot.',
+  cursedrelic: 'Silences and disarms the target and blocks its items.',
+  etherealshift: 'Brief invulnerability to wait out burst damage.',
+  warpstone: 'Short teleport to escape or chase.',
+  inhibitor: 'Enemies you hit deal less damage.',
+  suppressor: 'Enemies you hit fire more slowly.',
+  tankbuster: 'Percent-health damage — for tanky enemies.',
+  bulletresistshredder: 'Lowers the target\'s bullet resist.',
+  mysticvulnerability: 'Lowers the target\'s spirit resist.',
+  armorpiercingrounds: 'Bullets ignore part of the target\'s resist.',
 };
 
 function itemTile(r, step) {
   const it = r.it, boosted = r.up > 0, owned = isOwned(it), next = step && step === nextStep;
-  const tip = `${it.name} — ${num(it.cost)} dusz, kupowany w ${pct(r.p)} ${r.late ? 'gier trwających ponad 35 minut' : 'gier'}, WR ${(r.wr * 100).toFixed(1)}%, zwykle ok. ${Math.round(r.t / 60)}. minuty`;
+  const tip = `${it.name} — ${num(it.cost)} souls, bought in ${pct(r.p)} of ${r.late ? 'games longer than 35 minutes' : 'games'}, WR ${(r.wr * 100).toFixed(1)}%, usually around minute ${Math.round(r.t / 60)}`;
   return `<div class="tile ${esc(it.slot)}${boosted ? ' boosted' : ''}${owned ? ' owned' : ''}${next ? ' next' : ''}" title="${esc(tip)}">` +
     (step ? `<span class="num">${owned ? '✓' : step}</span>` : '') +
-    (next ? '<span class="flag buy">KUP</span>' : boosted && step && !owned ? '<span class="flag">KONTRA</span>' : '') +
+    (next ? '<span class="flag buy">BUY</span>' : boosted && step && !owned ? '<span class="flag">COUNTER</span>' : '') +
     `<div class="art">${it.img ? `<img src="${esc(it.img)}" alt="" loading="lazy">` : ''}</div>` +
     `<div class="plate">${esc(it.name)}</div><div class="rate"><i style="width:${Math.round(r.p * 100)}%"></i></div>` +
     `<div class="foot"><span class="cost">${num(it.cost)}</span><span class="pct">${pct(r.p)}</span></div></div>`;
@@ -674,10 +674,10 @@ function abilityBlock(entry) {
   // Umiejętność jest "zmaksowana" przy swoim ostatnim punkcie; kto kończy wcześniej, ten jest maksowany pierwszy.
   const count = id => seq.filter(x => x === id).length, last = id => seq.lastIndexOf(id);
   const order = ids.slice().sort((a, b) => count(b) - count(a) || last(a) - last(b));
-  return '<div class="block"><div class="label">Umiejętności</div><div class="abils">' + order.map((id, i) => {
+  return '<div class="block"><div class="label">Abilities</div><div class="abils">' + order.map((id, i) => {
     const ab = abilities.get(id);
-    return (i ? '<i class="arrow"></i>' : '') + `<div class="abil"><img src="${esc(ab.img)}" alt=""><div><b>${i === 0 ? 'MAKSUJ NAJPIERW' : (i + 1) + '.'}</b><span>${esc(ab.name)}</span></div></div>`;
-  }).join('') + `</div><p class="hint" style="margin-top:8px">Najczęstsza kolejność ulepszeń (${pct(top.matches / total)} gier, winrate ${(top.wins / top.matches * 100).toFixed(1)}%).</p></div>`;
+    return (i ? '<i class="arrow"></i>' : '') + `<div class="abil"><img src="${esc(ab.img)}" alt=""><div><b>${i === 0 ? 'MAX FIRST' : (i + 1) + '.'}</b><span>${esc(ab.name)}</span></div></div>`;
+  }).join('') + `</div><p class="hint" style="margin-top:8px">Most common upgrade order (${pct(top.matches / total)} of games, win rate ${(top.wins / top.matches * 100).toFixed(1)}%).</p></div>`;
 }
 
 // Który bohater statystycznie najlepiej wypada przeciwko temu składowi (z winrate'ów bohater kontra bohater).
@@ -699,12 +699,12 @@ function bestPicks(meta, enemies) {
 
 function renderEmpty() {
   if (OVERLAY && overlayAllies.length) {
-    $('out').innerHTML = '<div class="block"><div class="label">Kim grasz?</div><div class="versus">' + overlayAllies.map(id => {
+    $('out').innerHTML = '<div class="block"><div class="label">Who are you playing?</div><div class="versus">' + overlayAllies.map(id => {
       const h = heroById(id);
       return `<button class="vs" data-pick="${id}"><img src="${esc(h.img)}" alt=""><div class="n">${esc(h.name)}</div></button>`;
     }).join('') + '</div></div>';
   } else {
-    $('out').innerHTML = '<div class="empty"><b>Wybierz swojego bohatera</b>Kliknij portret po lewej, a potem dodaj przeciwników.</div>';
+    $('out').innerHTML = '<div class="empty"><b>Pick your hero</b>Click a portrait on the left, then add the enemies.</div>';
   }
 }
 
@@ -716,39 +716,39 @@ $('out').addEventListener('click', e => {
 function renderResult(entry) {
   const out = $('out'), me = heroById(slots[0]);
   if (!me) return;
-  if (entry.err) { out.innerHTML = `<div class="empty err"><b>Coś poszło nie tak</b>${esc(entry.err)}</div>`; return; }
+  if (entry.err) { out.innerHTML = `<div class="empty err"><b>Something went wrong</b>${esc(entry.err)}</div>`; return; }
   if (!entry.base || !entry.meta) { out.innerHTML = '<div class="skeleton"><div></div><div></div><div></div></div>'; return; }
-  if (!entry.base.length) { out.innerHTML = '<div class="empty"><b>Brak danych</b>Dla tego bohatera nie ma gier w wybranym zakresie rang. Wybierz szerszy zakres u góry.</div>'; return; }
+  if (!entry.base.length) { out.innerHTML = '<div class="empty"><b>No data</b>There are no games for this hero at the selected rank. Pick a wider range at the top.</div>'; return; }
   const enemies = slots.slice(1).filter(Boolean);
   const a = analyze(me.id, entry.base, entry.meta, entry.vs, enemies, entry.long);
   const fromPatch = entry.since && entry.since === entry.patch;
-  const day = t => new Date(t * 1000).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
+  const day = t => new Date(t * 1000).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 
   let html = `<div class="banner">${me.bg ? `<div class="bg" style="background-image:url('${esc(encodeURI(me.bg))}')"></div>` : ''}` +
     (me.card ? `<img class="card" src="${esc(me.card)}" alt="">` : '') +
-    `<div><div class="kicker">Build na ten mecz</div><h2>${esc(me.name)}</h2><div class="stats">` +
-    `<span class="stat"><b>${num(a.G)}</b>gier</span>` +
-    `<span class="stat"><b>${RANK_LABELS[entry.badge]}</b>ranga</span>` +
-    `<span class="stat"><b>${(a.wr0 * 100).toFixed(1)}%</b>winrate</span>` +
-    `<span class="stat"><b>${fromPatch ? 'od ' + day(entry.since) : entry.since ? '14 dni' : '30 dni'}</b>${fromPatch ? 'aktualny patch' : 'najnowsze mecze'}</span>` +
+    `<div><div class="kicker">Build for this match</div><h2>${esc(me.name)}</h2><div class="stats">` +
+    `<span class="stat"><b>${num(a.G)}</b>games</span>` +
+    `<span class="stat"><b>${RANK_LABELS[entry.badge]}</b>rank</span>` +
+    `<span class="stat"><b>${(a.wr0 * 100).toFixed(1)}%</b>win rate</span>` +
+    `<span class="stat"><b>${fromPatch ? 'since ' + day(entry.since) : entry.since ? '14 days' : '30 days'}</b>${fromPatch ? 'current patch' : 'latest matches'}</span>` +
     '</div></div></div>';
 
   const pending = enemies.filter(id => entry.vs.get(id)?.loading).length;
   const failed = enemies.filter(id => entry.vs.get(id)?.err);
-  if (pending) html += `<p class="note"><span class="spinner"></span>Pobieram dane o przeciwnikach (${enemies.length - pending - failed.length}/${enemies.length})…</p>`;
-  if (failed.length) html += `<p class="note err">Brak danych dla: ${failed.map(id => esc(heroById(id)?.name ?? id)).join(', ')} (${esc(entry.vs.get(failed[0]).err)}). Kliknij bohatera ponownie, żeby spróbować jeszcze raz.</p>`;
-  if (!entry.since) html += '<p class="note warn">W ostatnich 14 dniach jest za mało gier tego bohatera w tej randze, więc dane są z 30 dni.</p>';
-  if (a.G < 500) html += '<p class="note warn">To mała próba gier — rozważ szerszy zakres rang u góry strony.</p>';
-  if (!enemies.length) html += '<p class="note">To build ogólny. Dodaj przeciwników po lewej, żeby dopasować go do meczu.</p>';
+  if (pending) html += `<p class="note"><span class="spinner"></span>Loading enemy data (${enemies.length - pending - failed.length}/${enemies.length})…</p>`;
+  if (failed.length) html += `<p class="note err">No data for: ${failed.map(id => esc(heroById(id)?.name ?? id)).join(', ')} (${esc(entry.vs.get(failed[0]).err)}). Click the hero again to retry.</p>`;
+  if (!entry.since) html += '<p class="note warn">Too few games for this hero at this rank in the last 14 days, so the data covers 30 days.</p>';
+  if (a.G < 500) html += '<p class="note warn">Small sample of games — consider a wider rank range at the top of the page.</p>';
+  if (!enemies.length) html += '<p class="note">This is the general build. Add enemies on the left to tailor it to the match.</p>';
 
   if (a.en.length) {
     // Gdy znamy dusze, najgroźniejsi (najbogatsi) wrogowie idą na początek.
     const shown = a.en.slice().sort((x, y) => y.souls - x.souls);
-    html += '<div class="block"><div class="label">Przeciwnicy</div><div class="versus">' + shown.map(m => {
+    html += '<div class="block"><div class="label">Enemies</div><div class="versus">' + shown.map(m => {
       const h = heroById(m.id), v = m.shift === null ? null : m.shift * 100, fed = m.w >= 1.25;
-      return `<div class="vs${fed ? ' fed' : ''}" title="O tyle częściej lub rzadziej wygrywasz, gdy ten bohater jest po stronie wroga">` +
-        (h ? `<img src="${esc(h.img)}" alt="">` : '') + `<div><div class="n">${esc(h ? h.name : m.id)}${live.lane.has(m.id) ? '<span class="lanetag">LINIA</span>' : ''}${fed ? '<span class="fedtag">NAKARMIONY</span>' : ''}</div>` +
-        `<div class="g">${m.souls ? `<span class="souls">${fmtSouls(m.souls)} dusz</span>` : num(m.n) + ' gier'}</div></div>` +
+      return `<div class="vs${fed ? ' fed' : ''}" title="How much more or less often you win when this hero is on the enemy team">` +
+        (h ? `<img src="${esc(h.img)}" alt="">` : '') + `<div><div class="n">${esc(h ? h.name : m.id)}${live.lane.has(m.id) ? '<span class="lanetag">LANE</span>' : ''}${fed ? '<span class="fedtag">FED</span>' : ''}</div>` +
+        `<div class="g">${m.souls ? `<span class="souls">${fmtSouls(m.souls)} souls</span>` : num(m.n) + ' games'}</div></div>` +
         (v === null ? '' : `<span class="d ${v >= 0 ? 'pos' : 'neg'}">${pp(v)}</span>`) + '</div>';
     }).join('') + '</div></div>';
   }
@@ -760,14 +760,14 @@ function renderResult(entry) {
     const picks = mineOnly && mineOnly.length ? mineOnly : all, mine = picks.findIndex(x => x.h.id === me.id);
     const row = (x, i) => {
       const own = live.pool && live.pool.get(x.h.id);
-      const sub = own ? `twoje: ${own.m} ${own.m === 1 ? 'gra' : 'gier'}, ${Math.round(own.w / own.m * 100)}%` : `zwykle ${(x.base * 100).toFixed(1)}%`;
-      return `<button class="vs${x.h.id === me.id ? ' current' : ''}" data-pick="${x.h.id}" title="Zwykle ${(x.base * 100).toFixed(1)}%, na ten skład ${(x.wr * 100).toFixed(1)}%">` +
+      const sub = own ? `you: ${own.m} ${own.m === 1 ? 'game' : 'games'}, ${Math.round(own.w / own.m * 100)}%` : `usually ${(x.base * 100).toFixed(1)}%`;
+      return `<button class="vs${x.h.id === me.id ? ' current' : ''}" data-pick="${x.h.id}" title="Usually ${(x.base * 100).toFixed(1)}%, against this team ${(x.wr * 100).toFixed(1)}%">` +
         `<span class="rank">${i + 1}</span><img src="${esc(x.h.img)}" alt=""><div><div class="n">${esc(x.h.name)}</div><div class="g">${sub}</div></div>` +
         `<span class="d ${x.wr >= x.base ? 'pos' : 'neg'}">${(x.wr * 100).toFixed(1)}%</span></button>`;
     };
-    if (picks.length) html += `<div class="block"><div class="label">${picks === mineOnly ? 'Twoi bohaterowie na ten skład' : 'Najlepszy wybór na ten skład'}</div><div class="versus">` +
+    if (picks.length) html += `<div class="block"><div class="label">${picks === mineOnly ? 'Your heroes against this team' : 'Best picks against this team'}</div><div class="versus">` +
       picks.slice(0, 6).map(row).join('') + (mine >= 6 ? row(picks[mine], mine) : '') +
-      '</div><p class="hint" style="margin-top:8px">Przewidywany winrate bohatera przeciwko tym wrogom w wybranej randze. Kliknij, żeby zobaczyć jego build.</p></div>';
+      '</div><p class="hint" style="margin-top:8px">Predicted win rate of the hero against these enemies at the selected rank. Click to see its build.</p></div>';
   }
 
   html += abilityBlock(entry);
@@ -776,27 +776,27 @@ function renderResult(entry) {
   nextStep = 0;
   if (live.owned) { let n = 0; for (const ph of a.phases) for (const r of ph) { n++; if (!nextStep && !isOwned(r.it)) nextStep = n; } }
 
-  html += '<div class="block"><div class="label">Kolejność zakupów</div>' +
-    '<div class="legend"><span>Kupuj od lewej do prawej.</span>' +
-    '<span><i style="background:var(--weapon)"></i>Broń</span><span><i style="background:var(--vitality)"></i>Witalność</span><span><i style="background:var(--spirit)"></i>Spirit</span>' +
-    '<span>Procent = w ilu grach gracze biorą item (po 20. minucie: w ilu grach dłuższych niż 35 minut).</span>' +
-    (a.en.length ? '<span><i style="background:var(--good)"></i>Kontra = częściej kupowany na ten skład</span>' : '') + '</div>';
+  html += '<div class="block"><div class="label">Buy order</div>' +
+    '<div class="legend"><span>Buy left to right.</span>' +
+    '<span><i style="background:var(--weapon)"></i>Weapon</span><span><i style="background:var(--vitality)"></i>Vitality</span><span><i style="background:var(--spirit)"></i>Spirit</span>' +
+    '<span>Percent = share of games where players buy the item (after minute 20: of games longer than 35 minutes).</span>' +
+    (a.en.length ? '<span><i style="background:var(--good)"></i>Counter = bought more often against this team</span>' : '') + '</div>';
   let step = 0;
   PHASES.forEach((p, i) => {
     if (!a.phases[i].length) return;
     const sum = a.phases[i].reduce((s, r) => s + (r.it.cost || 0), 0);
     const laneNames = i === 0 ? enemies.filter(id => live.lane.has(id)).map(id => heroById(id)?.name).filter(Boolean) : [];
-    const sub = laneNames.length ? 'pod twoją linię: ' + laneNames.join(', ') : p.sub;
-    html += `<div class="phase"><div class="phase-head"><b>${p.name}</b><span>${esc(sub)}</span><span class="sum">${num(sum)} dusz</span></div><div class="flow">` +
+    const sub = laneNames.length ? 'for your lane: ' + laneNames.join(', ') : p.sub;
+    html += `<div class="phase"><div class="phase-head"><b>${p.name}</b><span>${esc(sub)}</span><span class="sum">${num(sum)} souls</span></div><div class="flow">` +
       a.phases[i].map(r => itemTile(r, ++step)).join('') + '</div></div>';
   });
   html += '</div>';
 
-  if (a.counters.length) html += '<div class="block"><div class="label">Kontry na ten skład</div><p class="hint">Itemy, które gracze kupują wyraźnie częściej przeciwko tym bohaterom. Pasek pokazuje, jak rośnie częstość zakupu.</p><div class="cards">' +
+  if (a.counters.length) html += '<div class="block"><div class="label">Counters to this team</div><p class="hint">Items players buy clearly more often against these heroes. The bar shows how the buy rate rises.</p><div class="cards">' +
     a.counters.map(r => counterCard(r, 'counter')).join('') + '</div></div>';
-  else if (a.en.length && !pending) html += '<div class="block"><div class="label">Kontry na ten skład</div><p class="hint">Przeciwko temu składowi gracze nie zmieniają wyraźnie zakupów — graj build standardowy.</p></div>';
+  else if (a.en.length && !pending) html += '<div class="block"><div class="label">Counters to this team</div><p class="hint">Players do not clearly change their purchases against this team — play the standard build.</p></div>';
   if (OVERLAY) publishList(a);
-  if (a.avoid.length) html += '<div class="block"><div class="label">Rzadziej kupowane w tym meczu</div><p class="hint">Popularne itemy, z których gracze częściej rezygnują przeciwko temu składowi.</p><div class="cards">' +
+  if (a.avoid.length) html += '<div class="block"><div class="label">Bought less in this match</div><p class="hint">Popular items players skip more often against this team.</p><div class="cards">' +
     a.avoid.map(r => counterCard(r, 'avoid')).join('') + '</div></div>';
   out.innerHTML = html;
 }
@@ -871,7 +871,7 @@ window.__cbUpdate = q => {
     renderPicker();
     refresh();
   } catch (e) {
-    $('out').innerHTML = `<div class="empty err"><b>Nie udało się pobrać listy bohaterów</b>${esc(e.message)}</div>`;
+    $('out').innerHTML = `<div class="empty err"><b>Could not load the hero list</b>${esc(e.message)}</div>`;
   }
 })();
 </script>
