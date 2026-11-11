@@ -358,7 +358,7 @@ let overlayQuery = location.search || (String(window.name).startsWith('?overlay'
 const OVERLAY = new URLSearchParams(overlayQuery).has('overlay');
 let overlayAllies = [];
 // Stan meczu przekazywany przez moda: dusze wrogów, kupione itemy, konto gracza (do puli jego bohaterów).
-const live = { souls: new Map(), owned: null, ownedRaw: null, cap: 0, lane: new Set(), acc: '', pool: null, poolLoading: false };
+const live = { souls: new Map(), owned: null, ownedRaw: null, cap: 0, minute: -1, lane: new Set(), acc: '', pool: null, poolLoading: false };
 const normName = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 if (OVERLAY) document.title = 'CB|boot';
 const statsCache = new Map(); // "hero|badge" -> dane
@@ -607,7 +607,7 @@ function analyze(me, base, meta, vs, enemies, long) {
       late = true;
     }
     rows.push({ it, p0, late, p: Math.min(1, Math.max(0, p)), wr: r.matches ? r.wins / r.matches : 0,
-      n: r.matches, sellRate: r.matches ? (r.sold || 0) / r.matches : 0, t: r.avg_buy_time_s, up, down, vsList });
+      n: r.matches, sellRate: r.matches ? (r.sold || 0) / r.matches : 0, sellT: r.avg_sell_time_s || 0, t: r.avg_buy_time_s, up, down, vsList });
   }
   const phases = PHASES.map((ph, i) => {
     const min = i ? PHASES[i - 1].max : 0;
@@ -935,32 +935,41 @@ function effCost(it) {
 // Liczymy tylko przedmioty ze sklepu (bez składników zużytych w ulepszeniach — tych nie ma w inv).
 const inventoryFull = () => !!live.ownedRaw && live.cap >= 4 && live.ownedRaw.size >= live.cap;
 function skipWhenFull(it) {
-  if (!inventoryFull() || (it.cost || 0) > 1600) return false;
+  const late = live.minute >= 20 && (it.cost || 0) <= 800;   // po 20. minucie tier 1 nie ma już sensu
+  if (!late && (!inventoryFull() || (it.cost || 0) > 1600)) return false;
   return !(it.comps || []).some(c => { const ci = [...items.values()].find(x => x.cls === c); return ci && live.ownedRaw.has(normName(ci.name)); });
 }
 
 function nextRow(a) { let n = 0; for (const ph of a.phases) for (const r of ph) { n++; if (n === nextStep) return r; } return null; }
 
-// Pełny ekwipunek: który posiadany item sprzedać pod następny zakup. Wybieramy ten, który gracze
-// najczęściej sprzedają (przy remisie tańszy), z pominięciem składników planowanych ulepszeń.
-// Nic nie podpowiadamy, gdy następny zakup jest ulepszeniem posiadanego itemu — wtedy slot się nie zmienia.
+// Co sprzedać. Dwa przypadki:
+// 1) pełny ekwipunek, a następny zakup potrzebuje wolnego slotu (nie jest ulepszeniem posiadanego itemu);
+// 2) późniejsza gra i prawie pełny ekwipunek: tani item (tier 1), który gracze zwykle już sprzedali.
+// W obu wypadkach najpierw najtańsze itemy, potem te najczęściej sprzedawane; nigdy składniki planowanych ulepszeń.
 function sellPick(a) {
-  if (!inventoryFull()) return null;
-  const next = nextRow(a);
-  if (!next) return null;
+  if (!live.ownedRaw) return null;
   const byCls = new Map([...items.values()].map(i => [i.cls, i]));
   const has = cls => { const ci = byCls.get(cls); return !!ci && live.ownedRaw.has(normName(ci.name)); };
-  if ((next.it.comps || []).some(has)) return null;
   const planned = new Set();
   for (const ph of a.phases) for (const r of ph) if (!isOwned(r.it)) for (const c of r.it.comps || []) planned.add(c);
-  let best = null;
-  for (const it of items.values()) {
-    if (!live.ownedRaw.has(normName(it.name)) || planned.has(it.cls)) continue;
-    const row = a.rows.find(r => r.it.id === it.id);
-    const score = (row ? row.sellRate : .5) * 100000 - (it.cost || 0);
-    if (!best || score > best.score) best = { it, score };
+  const owned = [...items.values()].filter(it => live.ownedRaw.has(normName(it.name)) && !planned.has(it.cls))
+    .map(it => ({ it, row: a.rows.find(r => r.it.id === it.id) }));
+  const rank = o => (o.it.cost || 0) * 10 - (o.row ? o.row.sellRate : .5) * 1000;
+  const next = nextRow(a);
+  if (inventoryFull() && next && !(next.it.comps || []).some(has)) {
+    const o = owned.sort((x, y) => rank(x) - rank(y))[0];
+    return o ? { it: o.it, text: 'Inventory full — sell ' + o.it.name } : null;
   }
-  return best ? best.it : null;
+  // Tani item w późniejszej grze: od minuty, w której gracze zwykle go sprzedają (domyślnie 20.), gdy zostały ≤2 wolne sloty.
+  if (live.minute >= 15 && live.ownedRaw.size >= live.cap - 2) {
+    const cheap = owned.filter(o => (o.it.cost || 0) <= 800 && live.minute * 60 >= Math.max(900, o.row && o.row.sellRate >= .3 && o.row.sellT ? o.row.sellT : 1200))
+      .sort((x, y) => rank(x) - rank(y))[0];
+    if (cheap) {
+      const at = cheap.row && cheap.row.sellRate >= .3 && cheap.row.sellT ? Math.round(cheap.row.sellT / 60) : 20;
+      return { it: cheap.it, text: `Sell ${cheap.it.name} — tier 1, usually sold by minute ${at}` };
+    }
+  }
+  return null;
 }
 let nextStep = 0; // numer pierwszego niekupionego itemu w kolejności (0 = nie wiemy, co gracz ma)
 
@@ -1041,7 +1050,7 @@ function publishList(a) {
     n++;
     if (isOwned(r.it) || skipWhenFull(r.it) || out.length >= 10) continue;
     const icon = (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
-    out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r), n === nextStep && sell ? sell.name : '']);
+    out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r), n === nextStep && sell ? sell.text : '']);
   }
   // Kontry spoza kolejności (np. sytuacyjne) też trafiają na listę, na końcu.
   for (const r of a.counters) {
@@ -1172,7 +1181,7 @@ function renderResult(entry) {
   if (live.owned) { let n = 0; for (const ph of a.phases) for (const r of ph) { n++; if (!nextStep && !isOwned(r.it) && !skipWhenFull(r.it)) nextStep = n; } }
 
   html += '<div class="block"><div class="label">Buy order</div>' +
-    (() => { const sell = sellPick(a), next = nextRow(a); return sell && next ? `<p class="note warn" style="margin:0 0 10px;border:1px solid var(--line);border-radius:8px">Inventory full (${live.ownedRaw.size}/${live.cap}): sell <b>${esc(sell.name)}</b> to make room for <b>${esc(next.it.name)}</b>.</p>` : ''; })() +
+    (() => { const sell = sellPick(a); return sell ? `<p class="note warn" style="margin:0 0 10px;border:1px solid var(--line);border-radius:8px">${esc(sell.text)} (${live.ownedRaw.size}/${live.cap} slots used).</p>` : ''; })() +
     '<div class="legend"><span>Buy left to right.</span>' +
     '<span><i style="background:var(--weapon)"></i>Weapon</span><span><i style="background:var(--vitality)"></i>Vitality</span><span><i style="background:var(--spirit)"></i>Spirit</span>' +
     '<span>Percent = share of games where players buy the item (after minute 20: of games longer than 35 minutes).</span>' +
@@ -1213,6 +1222,7 @@ function applyOverlay() {
   live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(normName)) : null;
   live.ownedRaw = params.has('inv') ? new Set(params.get('inv').split('|').filter(Boolean).map(normName)) : live.owned ? new Set(live.owned) : null;
   live.cap = parseInt(params.get('cap'), 10) || 12;
+  live.minute = params.has('t') ? parseInt(params.get('t'), 10) : -1;
   if (live.owned) {
     // Kupiony ulepszony item zawiera swoje składniki — sklep nie pokazuje ich już jako posiadanych.
     const byCls = new Map(), byName = new Map();
