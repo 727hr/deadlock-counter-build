@@ -640,6 +640,30 @@ function counterCard(r, mode) {
   return `<div class="ccard">${itemTile(r, 0)}<div class="reasons">${reasons}</div>${why ? `<div class="why-note">${esc(why)}</div>` : ''}</div>`;
 }
 
+// Lista zakupów dla moda: on rysuje ją w sklepie gry. Jedyny kanał ze strony do moda to tytuł strony,
+// więc lista idzie jako "CB|list|<json>": [nazwa, kategoria (w/v/s), cena, znacznik (K = kup teraz,
+// C = kontra, "" = zwykły), ścieżka ikony]. Tylko niekupione itemy, w kolejności zakupu.
+let lastList = '';
+function publishList(a) {
+  const out = [];
+  let n = 0;
+  for (const ph of a.phases) for (const r of ph) {
+    n++;
+    if (isOwned(r.it) || out.length >= 12) continue;
+    const icon = (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
+    out.push([r.it.name, (r.it.slot || '')[0] || '', r.it.cost || 0, n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon]);
+  }
+  // Kontry spoza kolejności (np. sytuacyjne) też trafiają na listę, na końcu.
+  for (const r of a.counters) {
+    if (out.length >= 14 || isOwned(r.it) || out.some(x => x[0] === r.it.name)) continue;
+    out.push([r.it.name, (r.it.slot || '')[0] || '', r.it.cost || 0, 'C', (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '')]);
+  }
+  const json = JSON.stringify(out);
+  if (json === lastList) return;
+  lastList = json;
+  document.title = 'CB|list|' + json;
+}
+
 // Kolejność maksowania umiejętności z najczęstszej sekwencji ulepszeń graczy.
 function abilityBlock(entry) {
   if (!entry.abil || !entry.abil.length || !abilities.size) return '';
@@ -771,6 +795,7 @@ function renderResult(entry) {
   if (a.counters.length) html += '<div class="block"><div class="label">Kontry na ten skład</div><p class="hint">Itemy, które gracze kupują wyraźnie częściej przeciwko tym bohaterom. Pasek pokazuje, jak rośnie częstość zakupu.</p><div class="cards">' +
     a.counters.map(r => counterCard(r, 'counter')).join('') + '</div></div>';
   else if (a.en.length && !pending) html += '<div class="block"><div class="label">Kontry na ten skład</div><p class="hint">Przeciwko temu składowi gracze nie zmieniają wyraźnie zakupów — graj build standardowy.</p></div>';
+  if (OVERLAY) publishList(a);
   if (a.avoid.length) html += '<div class="block"><div class="label">Rzadziej kupowane w tym meczu</div><p class="hint">Popularne itemy, z których gracze częściej rezygnują przeciwko temu składowi.</p><div class="cards">' +
     a.avoid.map(r => counterCard(r, 'avoid')).join('') + '</div></div>';
   out.innerHTML = html;
