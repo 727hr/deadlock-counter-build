@@ -644,19 +644,29 @@ function counterCard(r, mode) {
 // więc lista idzie jako "CB|list|<json>": [nazwa, kategoria (w/v/s), cena, znacznik (K = kup teraz,
 // C = kontra, "" = zwykły), ścieżka ikony]. Tylko niekupione itemy, w kolejności zakupu.
 let lastList = '';
+// Jedno–dwa zdania, dlaczego warto kupić item — mod pokazuje je po najechaniu na pozycję listy.
+function reason(r) {
+  const parts = [];
+  const why = WHY[normName(r.it.name)];
+  if (why) parts.push(why);
+  const vs = r.vsList.filter(v => v.z > 0).slice(0, 2).map(v => `${heroById(v.id)?.name} (${pct(v.pE)}, usually ${pct(v.p0)})`);
+  if (vs.length) parts.push('Bought more often against ' + vs.join(' and ') + '.');
+  else parts.push(`Bought in ${pct(r.p)} of ${r.late ? 'long games' : 'games'}${r.p >= .6 ? ' — a core item' : ''}.`);
+  return parts.join(' ').slice(0, 190);
+}
 function publishList(a) {
   const out = [];
   let n = 0;
   for (const ph of a.phases) for (const r of ph) {
     n++;
-    if (isOwned(r.it) || out.length >= 12) continue;
+    if (isOwned(r.it) || out.length >= 10) continue;
     const icon = (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
-    out.push([r.it.name, (r.it.slot || '')[0] || '', r.it.cost || 0, n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon]);
+    out.push([r.it.name, (r.it.slot || '')[0] || '', r.it.cost || 0, n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r)]);
   }
   // Kontry spoza kolejności (np. sytuacyjne) też trafiają na listę, na końcu.
   for (const r of a.counters) {
-    if (out.length >= 14 || isOwned(r.it) || out.some(x => x[0] === r.it.name)) continue;
-    out.push([r.it.name, (r.it.slot || '')[0] || '', r.it.cost || 0, 'C', (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '')]);
+    if (out.length >= 12 || isOwned(r.it) || out.some(x => x[0] === r.it.name)) continue;
+    out.push([r.it.name, (r.it.slot || '')[0] || '', r.it.cost || 0, 'C', (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, ''), reason(r)]);
   }
   const json = JSON.stringify(out);
   if (json === lastList) return;
@@ -828,6 +838,7 @@ function applyOverlay() {
     }
   }
   live.lane = new Set(list('lane'));
+  lastList = ''; // po każdej zmianie stanu lista idzie do moda od nowa (mod sam pomija powtórki)
   const acc = (params.get('acc') || '').replace(/[^0-9]/g, '');
   if (acc !== live.acc) { live.acc = acc; live.pool = null; live.poolLoading = false; }
   const remembered = store.get('dl-overlay-me');
