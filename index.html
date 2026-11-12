@@ -160,6 +160,7 @@
   .reason img { width: 26px; height: 26px; border-radius: 5px; object-fit: cover; }
   .reason .top { display: flex; justify-content: space-between; gap: 6px; font: 600 13px var(--cond); }
   .reason .top span:last-child { color: var(--good); white-space: nowrap; }
+  .reason .sub { font-size: 11px; color: var(--muted, #93a39b); margin-top: 2px; }
   .reason.down .top span:last-child { color: var(--bad); }
   .meter { position: relative; height: 5px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 3px; overflow: hidden; }
   .meter i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
@@ -703,6 +704,7 @@ async function refresh() {
       live.pool = new Map(d.map(r => [r.hero_id, { m: r.matches_played, w: r.wins }])); done();
     }).catch(() => { live.poolLoading = false; });
   }
+  for (const eid of slots.slice(1)) if (eid) loadGlobalCounters(eid).then(changed => { if (changed) done(); });
   for (const eid of slots.slice(1)) {
     const cur = entry.vs.get(eid);
     if (!eid || (cur && !cur.err)) continue; // mamy dane albo trwa pobieranie
@@ -711,6 +713,40 @@ async function refresh() {
       .catch(e => { entry.vs.set(eid, { err: e.message }); done(); });
   }
   done();
+}
+
+// ---------- kontry od wszystkich graczy ----------
+const GLOBAL_TTL = 12 * 3600e3, GLOBAL_MIN_LIFT = 1.3, GLOBAL_MIN_MATCHES = 150;
+const globalCounters = new Map();   // id wroga → [[item_id, krotność, średni czas zakupu], …]
+let globalBase = null, globalBaseP = null;
+const globalQ = () => `min_average_badge=80&min_unix_timestamp=${Math.floor(Date.now() / 86400e3) * 86400 - 14 * 86400}`;
+function loadGlobalBase() {
+  if (globalBase) return Promise.resolve(globalBase);
+  const c = store.get('dl-gc-v1-base');
+  if (c && Date.now() - c.t < GLOBAL_TTL) return Promise.resolve(globalBase = new Map(c.s));
+  return globalBaseP || (globalBaseP = queued(`${API}/analytics/item-stats?${globalQ()}`).then(rows => {
+    const S = rows.reduce((s, x) => s + x.matches, 0) || 1;
+    const shares = rows.map(x => [x.item_id, x.matches / S]);
+    store.set('dl-gc-v1-base', { t: Date.now(), s: shares });
+    return globalBase = new Map(shares);
+  }).catch(e => { globalBaseP = null; throw e; }));
+}
+const globalPending = new Set();
+async function loadGlobalCounters(eid) {
+  if (globalCounters.has(eid) || globalPending.has(eid)) return false;
+  const key = 'dl-gc-v1-' + eid, c = store.get(key);
+  if (c && Date.now() - c.t < GLOBAL_TTL) { globalCounters.set(eid, c.r); return true; }
+  globalPending.add(eid);
+  try {
+    const [base, rows] = await Promise.all([loadGlobalBase(), queued(`${API}/analytics/item-stats?${globalQ()}&enemy_hero_ids=${eid}`)]);
+    const S = rows.reduce((s, x) => s + x.matches, 0) || 1;
+    const r = rows.filter(x => x.matches >= GLOBAL_MIN_MATCHES && items.has(x.item_id))
+      .map(x => [x.item_id, +((x.matches / S) / (base.get(x.item_id) || 1e-6)).toFixed(3), Math.round(x.avg_buy_time_s || 0)])
+      .filter(x => x[1] >= 1.15).sort((a, b) => b[1] - a[1]).slice(0, 12);
+    store.set(key, { t: Date.now(), r });
+    globalCounters.set(eid, r);
+    return true;
+  } catch (e) { return false; } finally { globalPending.delete(eid); }
 }
 
 // Kolejka: najwyżej 2 zapytania naraz, z ponowieniem przy błędzie — API odrzuca zbyt wiele ciężkich zapytań jednocześnie.
@@ -786,6 +822,20 @@ function analyze(me, base, meta, vs, enemies, long) {
     return rows.filter(r => r.t >= min && r.t < ph.max && r.p >= .12).sort((a, b) => b.p - a.p).slice(0, ph.take)
       .sort((a, b) => a.t - b.t);
   });
+  for (const e of en) {
+    const g = globalCounters.get(e.id); if (!g) continue;
+    for (const [itemId, lift, t] of g.filter(x => x[1] >= GLOBAL_MIN_LIFT).slice(0, 3)) {
+      let r = rows.find(x => x.it.id === itemId);
+      if (!r) {
+        const it = items.get(itemId); if (!it) continue;
+        r = { it, p0: 0, late: false, p: 0, wr: 0, n: 0, sellRate: 0, sellT: 0, t, up: 0, down: 0, vsList: [] };
+        rows.push(r);
+      }
+      if (r.down < -4) continue;   // gracze tym bohaterem wyraźnie tego unikają przeciw temu wrogowi
+      r.up = Math.max(r.up, 0) + (lift - 1) * 6 * e.w;
+      (r.global = r.global || []).push({ id: e.id, lift });
+    }
+  }
   // Kontry mechaniczne: przedmiot, który wprost odbiera bohaterowi jego mocną stronę.
   for (const [itemName, list] of Object.entries(HARD_COUNTERS)) {
     const r = rows.find(x => x.it.name === itemName);
@@ -795,11 +845,11 @@ function analyze(me, base, meta, vs, enemies, long) {
       if (!why) continue;
       r.hard = (r.hard ? r.hard + ' ' : '') + why;
       r.up = Math.max(r.up, 0) + 6 * e.w;
-      if (!r.vsList.some(v => v.id === e.id)) r.vsList.unshift({ id: e.id, p0: r.p0, pE: r.p0, z: 6 });
+
     }
   }
   const isTargeted = r => r.vsList.some(v => v.z >= 3 && v.pE >= .02 && v.pE / Math.max(v.p0, .001) >= 1.8);
-  const counters = rows.filter(r => r.up > 0 && (r.p >= .05 || r.hard || isTargeted(r))).sort((a, b) => b.up - a.up).slice(0, 8);
+  const counters = rows.filter(r => r.up > 0 && (r.p >= .05 || r.hard || r.global || isTargeted(r))).sort((a, b) => b.up - a.up).slice(0, 8);
   const avoid = rows.filter(r => r.down < 0 && r.up === 0 && r.p0 >= .12).sort((a, b) => a.down - b.down).slice(0, 4);
   return { G, wr0, en, phases, counters, avoid, rows };
 }
@@ -1208,8 +1258,13 @@ function counterCard(r, mode) {
       `<div class="top"><span>vs ${esc(h.name)}</span><span>${pct(v.p0)} → ${pct(v.pE)}</span></div>` +
       `<div class="meter"><i class="${down ? 'from' : 'to'}" style="width:${hi}%"></i><i class="${down ? 'to' : 'from'}" style="width:${lo}%"></i></div></div></div>`;
   }).join('');
+  const extra = down ? '' : (r.hard ? `<div class="why-note">${esc(r.hard)}</div>` : '') + (r.global || []).filter(g => !list.some(v => v.id === g.id)).map(g => {
+    const h = heroById(g.id); if (!h) return '';
+    return `<div class="reason"><img src="${esc(h.img)}" alt=""><div><div class="top"><span>vs ${esc(h.name)}</span><span>${g.lift.toFixed(1)}× more often</span></div>` +
+      `<div class="sub">all players, Oracle+</div></div></div>`;
+  }).join('');
   const why = !down && WHY[normName(r.it.name)];
-  return `<div class="ccard">${itemTile(r, 0)}<div class="reasons">${reasons}</div>${why ? `<div class="why-note">${esc(why)}</div>` : ''}</div>`;
+  return `<div class="ccard">${itemTile(r, 0)}<div class="reasons">${reasons}${extra}</div>${why ? `<div class="why-note">${esc(why)}</div>` : ''}</div>`;
 }
 
 // Lista zakupów dla moda: on rysuje ją w sklepie gry. Jedyny kanał ze strony do moda to tytuł strony,
@@ -1227,7 +1282,9 @@ function reason(r) {
     return `${heroById(v.id)?.name} (${x >= 1.8 ? x.toFixed(1) + '× as often, ' : ''}${pct(v.pE)}, usually ${pct(v.p0)})`;
   });
   if (vs.length) parts.push('Bought more often against ' + vs.join(' and ') + '.');
-  else if (!r.hard) parts.push(`Bought in ${pct(r.p)} of ${r.late ? 'long games' : 'games'}${r.p >= .6 ? ' — a core item' : ''}.`);
+  const gl = (r.global || []).filter(g => !r.vsList.some(v => v.id === g.id && v.z > 0)).slice(0, 2);
+  if (gl.length) parts.push('All players buy it ' + gl.map(g => `${g.lift.toFixed(1)}× as often against ${heroById(g.id)?.name}`).join(' and ') + '.');
+  if (!vs.length && !r.hard && !gl.length) parts.push(`Bought in ${pct(r.p)} of ${r.late ? 'long games' : 'games'}${r.p >= .6 ? ' — a core item' : ''}.`);
   if (effCost(r.it) < (r.it.cost || 0)) parts.push(`Costs ${num(effCost(r.it))} instead of ${num(r.it.cost)} because you own a component.`);
   return parts.join(' ').slice(0, 230);
 }
@@ -1236,7 +1293,7 @@ function publishList(a) {
   let n = 0;
   for (const ph of a.phases) for (const r of ph) {
     n++;
-    if (isOwned(r.it) || skipWhenFull(r.it) || out.length >= 10) continue;
+    if (isOwned(r.it) || skipWhenFull(r.it) || out.length >= 8) continue;
     const icon = (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
     out.push([gameName(r.it), (r.it.slot || '')[0] || '', effCost(r.it), n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r), '']);
   }
