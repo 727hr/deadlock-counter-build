@@ -354,6 +354,106 @@
   .amax img { width: 22px; height: 22px; border-radius: 50%; background: #2b2540; padding: 2px; }
   .amax b { color: var(--gold); font-size: 11px; letter-spacing: .8px; }
 
+  /* ---------- wersja 3: mocniejszy wygląd ---------- */
+  :root { --glass: rgba(16,24,22,.72); --edge: #263632; }
+  body { font-size: 15.5px; }
+  body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1; opacity: .35;
+    background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px); background-size: 3px 3px; }
+  header { gap: 14px 22px; }
+  .brand .mark { background: linear-gradient(135deg, #2a2112, #120e07); }
+  .brand .mark i { background: linear-gradient(135deg, #ffd88f, var(--gold)); box-shadow: 0 0 12px var(--gold); }
+  h1 { letter-spacing: 3px; }
+  h1 em { background: linear-gradient(180deg, #ffe0a3, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ranks, .nav { background: var(--glass); backdrop-filter: blur(8px); border-color: var(--edge); }
+  .ranks button.on { background: linear-gradient(180deg, #f3c97a, #c99a45); box-shadow: 0 4px 14px -6px var(--gold); }
+  .panel { background: linear-gradient(180deg, rgba(20,29,27,.92), rgba(13,19,18,.94)); backdrop-filter: blur(6px); }
+
+  /* skład */
+  .lineup { gap: 26px; position: relative; }
+  .enemy-slots { position: relative; }
+  .enemy-slots::before { content: "VS"; position: absolute; left: -22px; top: 50%; transform: translate(-50%, -50%);
+    font: 400 16px var(--display); color: var(--gold); text-shadow: 0 0 12px rgba(232,185,100,.6); letter-spacing: 1px; }
+  .slot.me.filled { box-shadow: 0 0 0 1px var(--gold-dim), 0 10px 30px -10px var(--gold); }
+  .slot.enemy.filled { box-shadow: 0 6px 18px -10px var(--enemy); }
+  .slot img { transition: transform .25s; }
+  .slot:hover img { transform: scale(1.06); }
+  .grid { gap: 7px; }
+  .hero { transition: transform .12s, border-color .12s, box-shadow .12s; }
+  .hero:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 10px 20px -10px #000, 0 0 0 1px var(--gold-dim); z-index: 2; }
+  .hero img { transition: filter .15s; filter: saturate(.9); }
+  .hero:hover img { filter: saturate(1.15) brightness(1.08); }
+
+  /* baner bohatera */
+  .banner { min-height: 210px; padding: 26px 28px; align-items: center; }
+  .banner .bg { opacity: .62; background-position: center 22%; transform: scale(1.04); }
+  .banner::after { background: linear-gradient(90deg, rgba(10,15,14,.97) 0%, rgba(10,15,14,.7) 45%, rgba(10,15,14,.15) 100%), linear-gradient(0deg, rgba(10,15,14,.95), transparent 55%); }
+  .banner .card { width: 112px; height: 150px; box-shadow: 0 16px 40px -14px #000, 0 0 0 1px rgba(232,185,100,.35); }
+  .banner h2 { font-size: 56px; text-shadow: 0 4px 24px rgba(0,0,0,.6); }
+  .banner .kicker { letter-spacing: 3px; }
+  .stat { background: rgba(0,0,0,.5); border-color: rgba(255,255,255,.08); }
+  .wrbox { margin-left: auto; }
+  .wrbox .ring { width: 96px; height: 96px; filter: drop-shadow(0 0 10px rgba(232,185,100,.35)); }
+  .wrbox .ring text { font-size: 34px; }
+  .wrbox span { font: 600 11px var(--cond); letter-spacing: 2px; text-transform: uppercase; }
+
+  /* sekcje */
+  .block { animation: rise .35s ease both; }
+  .block:nth-of-type(2) { animation-delay: .04s; } .block:nth-of-type(3) { animation-delay: .08s; } .block:nth-of-type(4) { animation-delay: .12s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .label { color: #f0c779; }
+  .label::before { content: ""; width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg); box-shadow: 0 0 8px var(--gold); flex: none; }
+  .label::after { background: linear-gradient(90deg, rgba(232,185,100,.45), transparent); }
+  .vs { background: linear-gradient(180deg, #1c2825, #161f1d); transition: border-color .12s, transform .12s; }
+  button.vs:hover, a.vs:hover { transform: translateY(-1px); }
+  .vs img { border-radius: 9px; }
+  .note { border-left: 3px solid var(--gold-dim); }
+  .note.err { border-left-color: var(--bad); }
+
+  /* oś czasu buildu */
+  .timeline { position: relative; padding-left: 26px; }
+  .timeline::before { content: ""; position: absolute; left: 8px; top: 14px; bottom: 14px; width: 2px; border-radius: 2px;
+    background: linear-gradient(180deg, var(--gold), rgba(232,185,100,.15)); }
+  .timeline .phase { position: relative; margin-bottom: 14px; }
+  .timeline .phase::before { content: ""; position: absolute; left: -24px; top: 16px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--bg); border: 2px solid var(--gold); box-shadow: 0 0 10px rgba(232,185,100,.5); }
+  .phase-head { padding: 11px 16px; }
+  .phase-head b { font-size: 21px; }
+  .phase-head .sum { background: rgba(143,230,205,.08); border: 1px solid rgba(143,230,205,.22); border-radius: 999px; padding: 1px 10px; font-size: 14px; }
+  .flow { gap: 16px 24px; padding: 18px 16px 16px; }
+
+  /* kafelki jak w sklepie gry */
+  .tile { width: 104px; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 92%, #fff 8%), var(--c)); }
+  .tile .art { height: 72px; position: relative; background: radial-gradient(circle at 50% 38%, rgba(255,255,255,.28), transparent 68%); }
+  .tile .art img { width: 54px; height: 54px; }
+  .tile .tier { position: absolute; right: 6px; top: 5px; font: 700 11px var(--display); color: rgba(20,16,10,.75); letter-spacing: .5px; }
+  .tile .plate { font-size: 13.5px; min-height: 40px; background: linear-gradient(180deg, var(--plate), color-mix(in srgb, var(--plate) 86%, #000 14%)); }
+  .tile .foot { background: rgba(0,0,0,.62); }
+  .tile .num { left: -8px; top: -8px; min-width: 23px; height: 23px; line-height: 22px; border-radius: 12px; box-shadow: 0 2px 6px #000; }
+  .tile.next { animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 3px var(--gold), 0 0 18px -2px rgba(232,185,100,.7); } 50% { box-shadow: 0 0 0 3px var(--gold), 0 0 30px 2px rgba(232,185,100,.9); } }
+  .flow .tile:not(:last-child)::after { right: -17px; top: 34px; border-color: rgba(232,185,100,.55); }
+
+  /* kontry */
+  .ccard { background: linear-gradient(180deg, #1b2724, #151e1c); transition: border-color .12s, transform .12s; }
+  .ccard:hover { border-color: var(--gold-dim); transform: translateY(-2px); }
+  .why-note { color: #c9d3cd; }
+
+  footer { text-align: center; padding-top: 6px; }
+  footer a { color: var(--gold); text-decoration: none; }
+
+  /* nakładka w grze: oś czasu i baner w wersji zwartej */
+  body.overlay::before { display: none; }
+  body.overlay .timeline { padding-left: 18px; }
+  body.overlay .timeline::before { left: 5px; }
+  body.overlay .timeline .phase::before { left: -18px; width: 10px; height: 10px; }
+  body.overlay .banner { min-height: 0; padding: 12px 14px; }
+  body.overlay .banner h2 { font-size: 34px; }
+  body.overlay .wrbox .ring { width: 64px; height: 64px; }
+  body.overlay .wrbox .ring text { font-size: 30px; }
+  body.overlay .flow .tile { width: auto; }
+  body.overlay .block { animation: none; }
+  @media (max-width: 600px) { .banner h2 { font-size: 36px; } .wrbox { display: none; } .timeline { padding-left: 20px; } .lineup { gap: 18px; } .enemy-slots::before { left: -16px; font-size: 12px; } }
+
   footer { max-width: 1440px; margin: 0 auto; padding: 0 24px 30px; color: var(--muted); font-size: 12px; }
   footer a { color: var(--muted); }
 </style>
@@ -364,7 +464,7 @@
     <div class="mark"><i></i></div>
     <div>
       <h1>Deadlock <em>Builder</em></h1>
-      <p>Pick your hero and the enemy team to see what top players buy in that matchup.</p>
+      <p>Live item builds and counters from top-ranked Deadlock matches.</p>
     </div>
   </div>
   <nav class="nav" id="nav"><a href="./" data-nav="build">Build</a><a href="?profile=1" data-nav="profile">Profile</a><a href="?summary=1" data-nav="summary">Last match</a></nav>
@@ -1071,7 +1171,7 @@ function itemTile(r, step) {
   return `<div class="tile ${esc(it.slot)}${boosted ? ' boosted' : ''}${owned ? ' owned' : ''}${next ? ' next' : ''}" title="${esc(tip)}">` +
     (step ? `<span class="num">${owned ? '✓' : step}</span>` : '') +
     (next ? '<span class="flag buy">BUY</span>' : boosted && step && !owned ? '<span class="flag">COUNTER</span>' : '') +
-    `<div class="art">${it.img ? `<img src="${esc(it.img)}" alt="" loading="lazy">` : ''}</div>` +
+    `<div class="art">${it.img ? `<img src="${esc(it.img)}" alt="" loading="lazy">` : ''}${it.tier ? `<span class="tier">${['', 'I', 'II', 'III', 'IV', 'V'][it.tier] || ''}</span>` : ''}</div>` +
     `<div class="plate">${esc(it.name)}</div><div class="rate"><i style="width:${Math.round(r.p * 100)}%"></i></div>` +
     `<div class="foot"><span class="cost">${effCost(it) < (it.cost || 0) ? `${num(effCost(it))}<s>${num(it.cost)}</s>` : num(it.cost)}</span><span class="pct">${pct(r.p)}</span></div></div>`;
 }
@@ -1235,9 +1335,10 @@ function renderResult(entry) {
     `<div><div class="kicker">Build for this match</div><h2>${esc(me.name)}</h2><div class="stats">` +
     `<span class="stat"><b>${num(a.G)}</b>games</span>` +
     `<span class="stat"><b>${RANK_LABELS[entry.useBadge ?? entry.badge]}</b>rank</span>` +
-    `<span class="stat"><b>${(a.wr0 * 100).toFixed(1)}%</b>win rate</span>` +
+
     `<span class="stat"><b>${fromPatch ? 'since ' + day(entry.since) : entry.since ? Math.round((Date.now() / 1000 - entry.since) / 86400) + ' days' : '30 days'}</b>${fromPatch ? 'current patch' : 'latest matches'}</span>` +
-    '</div></div></div>';
+    '</div></div>' +
+    `<div class="scorebox wrbox"><svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" class="ring-bg"/><circle cx="60" cy="60" r="52" class="ring-fg" style="stroke-dasharray:${(a.wr0 * 326.7).toFixed(1)} 326.7"/><text x="60" y="68" text-anchor="middle">${(a.wr0 * 100).toFixed(0)}<tspan font-size="20">%</tspan></text></svg><span>win rate</span></div></div>`;
 
   const pending = enemies.filter(id => entry.vs.get(id)?.loading).length;
   const failed = enemies.filter(id => entry.vs.get(id)?.err);
@@ -1292,6 +1393,7 @@ function renderResult(entry) {
     '<span>Percent = share of games where players buy the item (after minute 20: of games longer than 35 minutes).</span>' +
     (a.en.length ? '<span><i style="background:var(--good)"></i>Counter = bought more often against this team</span>' : '') + '</div>';
   let step = 0;
+  html += '<div class="timeline">';
   PHASES.forEach((p, i) => {
     if (!a.phases[i].length) return;
     const sum = a.phases[i].reduce((s, r) => s + (isOwned(r.it) ? 0 : effCost(r.it)), 0);
@@ -1300,7 +1402,7 @@ function renderResult(entry) {
     html += `<div class="phase"><div class="phase-head"><b>${p.name}</b><span>${esc(sub)}</span><span class="sum">${num(sum)} souls${live.owned ? ' left' : ''}</span></div><div class="flow">` +
       a.phases[i].map(r => itemTile(r, ++step)).join('') + '</div></div>';
   });
-  html += '</div>';
+  html += '</div></div>';
 
   if (a.counters.length) html += '<div class="block"><div class="label">Counters to this team</div><p class="hint">Items players buy clearly more often against these heroes. The bar shows how the buy rate rises.</p><div class="cards">' +
     a.counters.map(r => counterCard(r, 'counter')).join('') + '</div></div>';
