@@ -1572,6 +1572,19 @@ function applyOverlay() {
   enemyNames.forEach((n, i) => { const id = find(n), s = parseSouls(enemySouls[i]); if (id && s) live.souls.set(id, s); });
   live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(toEn)) : null;
   live.ownedRaw = params.has('inv') ? new Set(params.get('inv').split('|').filter(Boolean).map(toEn)) : live.owned ? new Set(live.owned) : null;
+  // "Kupione w meczu" droższe niż wszystkie moje dusze = to zakupy z poprzedniej gry (sklep pokazuje je chwilę po starcie).
+  // Wtedy ufamy tylko obecnemu ekwipunkowi (i składnikom tego, co mam).
+  const mySouls = parseSouls(params.get('ms') || '');
+  if (mySouls && live.owned && live.ownedRaw) {
+    const costOf = n => [...items.values()].find(it => normName(it.name) === n)?.cost || 0;
+    const spent = [...live.owned].reduce((s, n) => s + costOf(n), 0);
+    if (spent > mySouls + 1500) {
+      const keep = new Set(live.ownedRaw);
+      const byCls = new Map([...items.values()].map(it => [it.cls, it]));
+      for (const it of items.values()) if (live.ownedRaw.has(normName(it.name))) for (const c of it.comps || []) { const ci = byCls.get(c); if (ci) keep.add(normName(ci.name)); }
+      live.owned = keep;
+    }
+  }
   // Kupienie ulepszenia zużywa jego składnik, ale gra dalej oznacza kafelek składnika jako posiadany.
   if (live.ownedRaw) {
     const byCls = new Map([...items.values()].map(it => [it.cls, it]));
