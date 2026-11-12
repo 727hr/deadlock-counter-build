@@ -334,6 +334,26 @@
   .search { border-radius: 10px; }
   footer { opacity: .8; }
 
+  /* ---------- siatka ulepszeń umiejętności ---------- */
+  .agrid { display: grid; gap: 3px 0; background: #0a0f0e; border: 1px solid #24332f; border-radius: 12px; padding: 8px 10px 10px; overflow-x: auto; }
+  .agrid .row { display: contents; }
+  .agrid .ab { display: flex; align-items: center; justify-content: center; background: #efe6d2; border-radius: 6px 0 0 6px; width: 38px; height: 34px; }
+  .agrid .ab img { width: 28px; height: 28px; filter: brightness(0); }
+  .agrid .c { height: 34px; display: flex; align-items: center; justify-content: center; background: #121a18; }
+  .agrid .row:nth-child(odd) .c { background: #0f1615; }
+  .agrid .row .c:last-child { border-radius: 0 6px 6px 0; }
+  .agrid .t { font: 600 10px var(--cond); color: var(--muted); text-align: center; padding-bottom: 3px; }
+  .mk { display: inline-flex; align-items: center; gap: 2px; padding: 2px 5px; border-radius: 6px; background: #2a3532; color: #e6dccb;
+    font: 700 13px var(--cond); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); white-space: nowrap; }
+  .mk::before { content: ""; width: 8px; height: 8px; border: 2px solid currentColor; transform: rotate(45deg); border-radius: 2px; box-sizing: border-box; margin-right: 2px; opacity: .85; }
+  .mk.unlock { background: #3b2a55; color: #c9a2ff; box-shadow: inset 0 0 0 1px rgba(201,162,255,.35); }
+  .mk.unlock::before { background: currentColor; margin-right: 0; }
+  .mk.t5 { background: #3a2f17; color: var(--gold); }
+  .amax { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .amax span { display: inline-flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid #24332f; border-radius: 999px; padding: 3px 10px 3px 4px; font: 600 13px var(--cond); }
+  .amax img { width: 22px; height: 22px; border-radius: 50%; background: #2b2540; padding: 2px; }
+  .amax b { color: var(--gold); font-size: 11px; letter-spacing: .8px; }
+
   footer { max-width: 1440px; margin: 0 auto; padding: 0 24px 30px; color: var(--muted); font-size: 12px; }
   footer a { color: var(--muted); }
 </style>
@@ -406,7 +426,7 @@ async function getJSON(url) {
 }
 
 async function loadAssets() {
-  const cached = store.get('dl-assets-v5');
+  const cached = store.get('dl-assets-v6');
   if (cached && Date.now() - cached.t < 6 * 3600e3) return cached;
   const [h, it, ab] = await Promise.all([
     getJSON(API + '/assets/heroes?only_active=true'),
@@ -418,14 +438,15 @@ async function loadAssets() {
     // Nowi bohaterowie (np. Violet, Baba) mają flagę in_development, choć są grywalni — liczy się player_selectable.
     heroes: h.filter(x => x.player_selectable && !x.disabled)
       .map(x => ({ id: x.id, name: x.name, img: x.images?.icon_image_small_webp || x.images?.icon_hero_card_webp || '',
-        card: x.images?.icon_hero_card_webp || '', bg: x.images?.background_image_webp || '' }))
+        card: x.images?.icon_hero_card_webp || '', bg: x.images?.background_image_webp || '',
+        sig: [1, 2, 3, 4].map(n => x.items?.['signature' + n]).filter(Boolean) }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     abilities: ab.filter(x => x.name && (x.image_webp || x.image) && (x.ability_type === 'signature' || x.ability_type === 'ultimate'))
-      .map(x => ({ id: x.id, name: x.name, img: x.image_webp || x.image })),
+      .map(x => ({ id: x.id, name: x.name, img: x.image_webp || x.image, cls: x.class_name })),
     items: it.filter(x => x.shopable)
       .map(x => ({ id: x.id, name: x.name, img: x.shop_image_webp || x.image_webp || '', slot: x.item_slot_type, tier: x.item_tier, cost: x.cost, cls: x.class_name, comps: x.component_items || [] })),
   };
-  store.set('dl-assets-v5', data);
+  store.set('dl-assets-v6', data);
   return data;
 }
 
@@ -1132,20 +1153,37 @@ function objectivesBlock() {
     (tip ? `<p class="note warn" style="margin:8px 0 0;border:1px solid var(--line);border-radius:8px">${tip}</p>` : '') + '</div>';
 }
 
-// Kolejność maksowania umiejętności z najczęstszej sekwencji ulepszeń graczy.
+// Kolejność ulepszeń umiejętności z najczęstszej sekwencji graczy, rysowana jak w grze: wiersz na umiejętność,
+// kolumna na kolejny punkt. Pierwsze wystąpienie = odblokowanie (fioletowy romb), kolejne = ulepszenia za 1, 2 i 5 punktów.
 function abilityBlock(entry) {
   if (!entry.abil || !entry.abil.length || !abilities.size) return '';
   const total = entry.abil.reduce((s, r) => s + r.matches, 0);
-  const top = entry.abil.reduce((a, b) => b.matches > a.matches ? b : a);
-  const seq = top.abilities || [], ids = [...new Set(seq)];
+  const top = entry.abil.reduce((x, y) => y.matches > x.matches ? y : x);
+  const seq = top.abilities || [], times = top.avg_upgrade_times_s || [], ids = [...new Set(seq)];
   if (ids.length < 3 || ids.some(id => !abilities.has(id))) return '';
-  // Umiejętność jest "zmaksowana" przy swoim ostatnim punkcie; kto kończy wcześniej, ten jest maksowany pierwszy.
+  const hero = heroById(slots[0]), byCls = new Map([...abilities.values()].map(x => [x.cls, x.id]));
+  const slotOrder = (hero?.sig || []).map(c => byCls.get(c)).filter(id => ids.includes(id));
+  const rows = slotOrder.length === ids.length ? slotOrder : ids;
+  const COST = ['unlock', '1', '2', '5'];
+  const cols = seq.length;
+  let html = `<div class="agrid" style="grid-template-columns:38px repeat(${cols}, minmax(26px, 1fr))"><div></div>` +
+    seq.map((_, i) => `<div class="t">${times[i] ? Math.max(1, Math.round(times[i] / 60)) + 'm' : ''}</div>`).join('');
+  for (const id of rows) {
+    const ab = abilities.get(id); let n = 0;
+    html += `<div class="row"><div class="ab" title="${esc(ab.name)}"><img src="${esc(ab.img)}" alt=""></div>` + seq.map((x, i) => {
+      if (x !== id) return '<div class="c"></div>';
+      const k = COST[Math.min(n++, 3)];
+      return `<div class="c" title="${esc(ab.name)} — ${k === 'unlock' ? 'unlock' : 'upgrade (' + k + ' AP)'}${times[i] ? ', around minute ' + Math.round(times[i] / 60) : ''}">` +
+        (k === 'unlock' ? '<span class="mk unlock"></span>' : `<span class="mk${k === '5' ? ' t5' : ''}">${k}</span>`) + '</div>';
+    }).join('') + '</div>';
+  }
+  html += '</div>';
+  // Kolejność maksowania: kto dostaje ostatni punkt najwcześniej.
   const count = id => seq.filter(x => x === id).length, last = id => seq.lastIndexOf(id);
-  const order = ids.slice().sort((a, b) => count(b) - count(a) || last(a) - last(b));
-  return '<div class="block"><div class="label">Abilities</div><div class="abils">' + order.map((id, i) => {
-    const ab = abilities.get(id);
-    return (i ? '<i class="arrow"></i>' : '') + `<div class="abil"><img src="${esc(ab.img)}" alt=""><div><b>${i === 0 ? 'MAX FIRST' : (i + 1) + '.'}</b><span>${esc(ab.name)}</span></div></div>`;
-  }).join('') + `</div><p class="hint" style="margin-top:8px">Most common upgrade order (${pct(top.matches / total)} of games, win rate ${(top.wins / top.matches * 100).toFixed(1)}%).</p></div>`;
+  const order = ids.slice().sort((x, y) => count(y) - count(x) || last(x) - last(y));
+  const max = '<div class="amax">' + order.map((id, i) => `<span><img src="${esc(abilities.get(id).img)}" alt="">${i === 0 ? '<b>MAX FIRST</b>' : '<b>' + (i + 1) + '.</b>'}${esc(abilities.get(id).name)}</span>`).join('') + '</div>';
+  return `<div class="block"><div class="label">Ability upgrade order</div>${html}${max}` +
+    `<p class="hint" style="margin-top:8px">Most common order (${pct(top.matches / total)} of games, win rate ${(top.wins / top.matches * 100).toFixed(1)}%). Minutes on top are the average time of each point.</p></div>`;
 }
 
 // Który bohater statystycznie najlepiej wypada przeciwko temu składowi (z winrate'ów bohater kontra bohater).
