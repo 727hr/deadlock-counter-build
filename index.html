@@ -1215,22 +1215,22 @@ function publishList(a) {
     n++;
     if (isOwned(r.it) || skipWhenFull(r.it) || out.length >= 10) continue;
     const icon = (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
-    out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r), '']);
+    out.push([gameName(r.it), (r.it.slot || '')[0] || '', effCost(r.it), n === nextStep ? 'K' : r.up > 0 ? 'C' : '', icon, reason(r), '']);
   }
   // Kontry spoza kolejności (np. sytuacyjne) też trafiają na listę, na końcu.
   for (const r of a.counters) {
-    if (out.length >= 12 || isOwned(r.it) || out.some(x => x[0] === r.it.name)) continue;
-    out.push([r.it.name, (r.it.slot || '')[0] || '', effCost(r.it), 'C', (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, ''), reason(r)]);
+    if (out.length >= 12 || isOwned(r.it) || out.some(x => x[0] === gameName(r.it))) continue;
+    out.push([gameName(r.it), (r.it.slot || '')[0] || '', effCost(r.it), 'C', (r.it.img.split('/images/')[1] || '').replace(/\.\w+$/, ''), reason(r)]);
   }
   const tr = live.acc && slots[0] ? store.get('dl-trend-' + live.acc + '-' + slots[0]) : null;
   if (tr && tr.dieOften && Date.now() - tr.at < 30 * 86400e3) {
-    const di = out.findIndex((x, i) => i > 1 && DEFENSIVE.includes(normName(x[0])));
+    const di = out.findIndex((x, i) => i > 1 && DEFENSIVE.some(d => normName(x[0]) === d || normName(gameName([...items.values()].find(it => normName(it.name) === d) || { name: '' })) === normName(x[0])));
     if (di > 1) { const [d] = out.splice(di, 1); d[5] = 'You often die a lot on this hero (from your recent match summaries). ' + d[5]; out.splice(1, 0, d); }
   }
   // Pozycja "S" (sprzedaj) idzie na górę: nazwa, kategoria, zwrot (połowa ceny), ikona, powód.
   if (sell) {
     const icon = (sell.it.img.split('/images/')[1] || '').replace(/\.\w+$/, '');
-    out.unshift([sell.it.name, (sell.it.slot || '')[0] || '', Math.round((sell.it.cost || 0) / 2), 'S', icon, sell.text + '.', '']);
+    out.unshift([gameName(sell.it), (sell.it.slot || '')[0] || '', Math.round((sell.it.cost || 0) / 2), 'S', icon, sell.text + '.', '']);
   }
   const json = JSON.stringify(out);
   if (json === lastList) return;
@@ -1419,18 +1419,53 @@ function renderResult(entry) {
 // Ustawia skład z zapytania nakładki: me=, allies=, enemies= (angielskie nazwy bohaterów).
 // Parametry mogą być w zapytaniu (?…) albo po krzyżyku (#…). Mod zmienia tylko część po krzyżyku,
 // bo taka zmiana nie przeładowuje strony — tak dochodzi stan meczu na żywo.
+// Nazwy bohaterów i itemów w języku gry (z API), żeby rozumieć, co przysyła mod, i odsyłać listę w tym języku.
+// Polskie nazwy z API mają czasem znacznik odmiany "#|mp|#" — usuwamy go.
+const loc = { lang: 'english', heroByName: new Map(), itemByName: new Map(), itemName: new Map() };
+const cleanLoc = s => String(s || '').replace(/#\|[^#]*#/g, '').trim();
+async function loadLocale(lang) {
+  if (!lang || lang === 'english' || loc.lang === lang) return;
+  const key = 'dl-loc-v1-' + lang;
+  let data = store.get(key);
+  if (!data || Date.now() - data.t > 6 * 3600e3) {
+    const [h, it] = await Promise.all([
+      getJSON(`${API}/assets/heroes?only_active=true&language=${encodeURIComponent(lang)}`),
+      getJSON(`${API}/assets/items/by-type/upgrade?language=${encodeURIComponent(lang)}`),
+    ]);
+    data = { t: Date.now(), heroes: h.map(x => [x.id, cleanLoc(x.name)]), items: it.filter(x => x.shopable).map(x => [x.id, cleanLoc(x.name)]) };
+    store.set(key, data);
+  }
+  loc.lang = lang;
+  loc.heroByName = new Map(data.heroes.map(([id, n]) => [normName(n), id]));
+  loc.itemByName = new Map(data.items.map(([id, n]) => [normName(n), id]));
+  loc.itemName = new Map(data.items);
+}
+// Nazwa itemu, której używa gra (do listy w grze); bez tłumaczenia — angielska.
+const gameName = it => (loc.lang !== 'english' && loc.itemName.get(it.id)) || it.name;
+// Język z adresu (mod 2.5+), a dla starszego moda: polski, jeśli przysłane nazwy bohaterów nie są angielskie.
+function overlayLang() {
+  const params = new URLSearchParams(overlayQuery);
+  for (const [k, v] of new URLSearchParams(location.hash.slice(1))) params.set(k, v);
+  const lang = (params.get('lang') || '').toLowerCase();
+  if (lang) return lang;
+  const sent = ['me', 'allies', 'enemies'].flatMap(k => (params.get(k) || '').split(',')).filter(Boolean);
+  return sent.some(n => !heroes.some(h => normName(h.name) === normName(n))) ? 'polish' : 'english';
+}
+
 function applyOverlay() {
   const params = new URLSearchParams(overlayQuery);
   for (const [k, v] of new URLSearchParams(location.hash.slice(1))) params.set(k, v);
-  const find = n => heroes.find(h => normName(h.name) === normName(n))?.id ?? null;
+  const find = n => heroes.find(h => normName(h.name) === normName(n))?.id ?? loc.heroByName.get(normName(n)) ?? null;
+  // Nazwy itemów z gry → angielskie (na nich liczy reszta strony).
+  const toEn = n => { const id = loc.itemByName.get(normName(n)); const it = id && items.get(id); return normName(it ? it.name : n); };
   const names = key => (params.get(key) || '').split(',').filter(Boolean);
   const list = key => names(key).map(find).filter(Boolean);
   const enemyNames = names('enemies'), enemySouls = (params.get('es') || '').split(',');
   const enemies = list('enemies'); overlayAllies = list('allies');
   live.souls = new Map();
   enemyNames.forEach((n, i) => { const id = find(n), s = parseSouls(enemySouls[i]); if (id && s) live.souls.set(id, s); });
-  live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(normName)) : null;
-  live.ownedRaw = params.has('inv') ? new Set(params.get('inv').split('|').filter(Boolean).map(normName)) : live.owned ? new Set(live.owned) : null;
+  live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(toEn)) : null;
+  live.ownedRaw = params.has('inv') ? new Set(params.get('inv').split('|').filter(Boolean).map(toEn)) : live.owned ? new Set(live.owned) : null;
   live.cap = parseInt(params.get('cap'), 10) || 12;
   live.minute = params.has('t') ? parseInt(params.get('t'), 10) : -1;
   // ob = strażnicy moi, walkery moje, patron mój, strażnicy wroga, walkery wroga, patron wroga ("a/b" = stoi/razem).
@@ -1459,14 +1494,16 @@ function applyOverlay() {
   // Tytuł strony to jedyne, co mod widzi z okna — służy do diagnostyki w logu gry.
   document.title = `CB|loaded|me=${mine ?? '?'}|allies=${overlayAllies.length}|enemies=${enemies.length}|souls=${live.souls.size}|own=${live.owned ? live.owned.size : '-'}|lane=${live.lane.size}|${Date.now() % 100000}`;
 }
-window.addEventListener('hashchange', () => {
+window.addEventListener('hashchange', async () => {
   if (!OVERLAY || !heroes.length) return;
+  try { await loadLocale(overlayLang()); } catch (e) {}
   applyOverlay(); renderPicker(); refresh();
 });
 // Mod woła to przy każdej zmianie składu.
-window.__cbUpdate = q => {
+window.__cbUpdate = async q => {
   overlayQuery = q;
   if (!heroes.length) return; // lista bohaterów jeszcze się pobiera; init użyje nowego zapytania
+  try { await loadLocale(overlayLang()); } catch (e) {}
   applyOverlay(); renderPicker(); refresh();
 };
 
@@ -1491,6 +1528,7 @@ window.__cbUpdate = q => {
     if (!OVERLAY) live.acc = (new URLSearchParams(location.search).get('acc') || '').replace(/[^0-9]/g, '');
     if (OVERLAY) {
       document.body.classList.add('overlay');
+      try { await loadLocale(overlayLang()); } catch (e) {}
       applyOverlay();
     } else {
       const saved = store.get('dl-slots');
