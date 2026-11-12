@@ -514,7 +514,7 @@ const OVERLAY = new URLSearchParams(overlayQuery).has('overlay');
 let overlayAllies = [];
 // Stan meczu przekazywany przez moda: dusze wrogów, kupione itemy, konto gracza (do puli jego bohaterów).
 const live = { souls: new Map(), owned: null, ownedRaw: null, cap: 0, minute: -1, ob: null, lane: new Set(), acc: '', pool: null, poolLoading: false };
-const normName = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+const normName = s => String(s).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 if (OVERLAY) document.title = 'CB|boot';
 const statsCache = new Map(); // "hero|badge" -> dane
 
@@ -1424,7 +1424,9 @@ function renderResult(entry) {
 const loc = { lang: 'english', heroByName: new Map(), itemByName: new Map(), itemName: new Map() };
 const cleanLoc = s => String(s || '').replace(/#\|[^#]*#/g, '').trim();
 async function loadLocale(lang) {
-  if (!lang || lang === 'english' || loc.lang === lang) return;
+  // Angielski: czyścimy tłumaczenia, żeby lista nie poszła do gry w poprzednio wykrytym języku.
+  if (!lang || lang === 'english') { loc.lang = 'english'; loc.heroByName = new Map(); loc.itemByName = new Map(); loc.itemName = new Map(); return; }
+  if (loc.lang === lang) return;
   const key = 'dl-loc-v1-' + lang;
   let data = store.get(key);
   if (!data || Date.now() - data.t > 6 * 3600e3) {
@@ -1442,14 +1444,38 @@ async function loadLocale(lang) {
 }
 // Nazwa itemu, której używa gra (do listy w grze); bez tłumaczenia — angielska.
 const gameName = it => (loc.lang !== 'english' && loc.itemName.get(it.id)) || it.name;
-// Język z adresu (mod 2.5+), a dla starszego moda: polski, jeśli przysłane nazwy bohaterów nie są angielskie.
-function overlayLang() {
+// Języki klienta Steam, które zna API (te same nazwy, które zwraca gra).
+const LANGS = ['polish', 'german', 'french', 'spanish', 'latam', 'russian', 'ukrainian', 'brazilian', 'portuguese', 'italian', 'turkish',
+  'czech', 'hungarian', 'romanian', 'bulgarian', 'greek', 'dutch', 'danish', 'finnish', 'norwegian', 'swedish', 'thai', 'vietnamese',
+  'indonesian', 'schinese', 'tchinese', 'japanese', 'koreana'];
+// Język z adresu (mod 2.5+). Bez niego: jeśli przysłane nazwy nie są angielskie, sprawdzamy kolejne języki
+// (najpierw ostatnio wykryty) i bierzemy pierwszy, w którym zgadzają się nazwy bohaterów lub itemów.
+async function overlayLang() {
   const params = new URLSearchParams(overlayQuery);
   for (const [k, v] of new URLSearchParams(location.hash.slice(1))) params.set(k, v);
   const lang = (params.get('lang') || '').toLowerCase();
   if (lang) return lang;
-  const sent = ['me', 'allies', 'enemies'].flatMap(k => (params.get(k) || '').split(',')).filter(Boolean);
-  return sent.some(n => !heroes.some(h => normName(h.name) === normName(n))) ? 'polish' : 'english';
+  const sentHeroes = ['me', 'allies', 'enemies'].flatMap(k => (params.get(k) || '').split(',')).filter(Boolean);
+  const sentItems = ['own', 'inv'].flatMap(k => (params.get(k) || '').split('|')).filter(Boolean);
+  const unknown = sentHeroes.filter(n => !heroes.some(h => normName(h.name) === normName(n)))
+    .concat(sentItems.filter(n => ![...items.values()].some(it => normName(it.name) === normName(n))));
+  if (!unknown.length) return 'english';
+  if (loc.lang !== 'english' && unknown.some(n => loc.heroByName.has(normName(n)) || loc.itemByName.has(normName(n)))) return loc.lang;
+  const names = await Promise.all(LANGS.map(async l => {
+    const key = 'dl-heroloc-v1-' + l;
+    let cached = store.get(key);
+    if (!cached || Date.now() - cached.t > 24 * 3600e3) {
+      try { const h = await getJSON(`${API}/assets/heroes?only_active=true&language=${l}`); cached = { t: Date.now(), n: h.map(x => normName(cleanLoc(x.name))) }; store.set(key, cached); }
+      catch (e) { return null; }
+    }
+    return new Set(cached.n);
+  }));
+  const last = store.get('dl-lang');
+  const order = [...LANGS.keys()].sort((x, y) => (LANGS[y] === last) - (LANGS[x] === last));
+  for (const i of order) {
+    if (names[i] && unknown.some(n => names[i].has(normName(n)))) { store.set('dl-lang', LANGS[i]); return LANGS[i]; }
+  }
+  return 'english';
 }
 
 function applyOverlay() {
@@ -1496,14 +1522,14 @@ function applyOverlay() {
 }
 window.addEventListener('hashchange', async () => {
   if (!OVERLAY || !heroes.length) return;
-  try { await loadLocale(overlayLang()); } catch (e) {}
+  try { await loadLocale(await overlayLang()); } catch (e) {}
   applyOverlay(); renderPicker(); refresh();
 });
 // Mod woła to przy każdej zmianie składu.
 window.__cbUpdate = async q => {
   overlayQuery = q;
   if (!heroes.length) return; // lista bohaterów jeszcze się pobiera; init użyje nowego zapytania
-  try { await loadLocale(overlayLang()); } catch (e) {}
+  try { await loadLocale(await overlayLang()); } catch (e) {}
   applyOverlay(); renderPicker(); refresh();
 };
 
@@ -1528,7 +1554,7 @@ window.__cbUpdate = async q => {
     if (!OVERLAY) live.acc = (new URLSearchParams(location.search).get('acc') || '').replace(/[^0-9]/g, '');
     if (OVERLAY) {
       document.body.classList.add('overlay');
-      try { await loadLocale(overlayLang()); } catch (e) {}
+      try { await loadLocale(await overlayLang()); } catch (e) {}
       applyOverlay();
     } else {
       const saved = store.get('dl-slots');
