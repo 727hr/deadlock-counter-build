@@ -1492,6 +1492,14 @@ function applyOverlay() {
   enemyNames.forEach((n, i) => { const id = find(n), s = parseSouls(enemySouls[i]); if (id && s) live.souls.set(id, s); });
   live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(toEn)) : null;
   live.ownedRaw = params.has('inv') ? new Set(params.get('inv').split('|').filter(Boolean).map(toEn)) : live.owned ? new Set(live.owned) : null;
+  // Kupienie ulepszenia zużywa jego składnik, ale gra dalej oznacza kafelek składnika jako posiadany.
+  if (live.ownedRaw) {
+    const byCls = new Map([...items.values()].map(it => [it.cls, it]));
+    for (const it of items.values()) {
+      if (!live.ownedRaw.has(normName(it.name))) continue;
+      for (const c of it.comps || []) { const ci = byCls.get(c); if (ci) live.ownedRaw.delete(normName(ci.name)); }
+    }
+  }
   live.cap = parseInt(params.get('cap'), 10) || 12;
   live.minute = params.has('t') ? parseInt(params.get('t'), 10) : -1;
   // ob = strażnicy moi, walkery moje, patron mój, strażnicy wroga, walkery wroga, patron wroga ("a/b" = stoi/razem).
