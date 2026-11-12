@@ -730,6 +730,10 @@ function pump() {
 
 // Podstawa: jak często gracze z danej rangi kupują item na tym bohaterze (p0),
 // i jak ta częstość zmienia się, gdy w drużynie wroga jest konkretny bohater (pE).
+// Kontry wynikające z mechaniki gry (nazwa itemu → bohater → opis do podpowiedzi).
+const HARD_COUNTERS = {
+  'Knockdown': { 'Vindicta': 'Knockdown pulls Vindicta out of the air during Flight.' },
+};
 function analyze(me, base, meta, vs, enemies, long) {
   const maxBase = Math.max(...base.map(r => r.matches));
   const hero = meta.games.get(me);
@@ -758,7 +762,9 @@ function analyze(me, base, meta, vs, enemies, long) {
       const pE = Math.min(1, (er ? er.matches : 0) / e.n);
       const diff = pE - p0;
       const z = diff / Math.sqrt(Math.max(p0 * (1 - p0), .01) / e.n);
-      if (Math.abs(z) < 2 || Math.abs(diff) < .02) continue;
+      const lift = pE / Math.max(p0, .001);
+      const targeted = z >= 3 && lift >= 1.8 && pE >= .02;   // rzadki, ale kupowany wyraźnie częściej przeciw temu bohaterowi
+      if (!targeted && (Math.abs(z) < 2 || Math.abs(diff) < .02)) continue;
       adj += diff * e.w * e.n / (e.n + 150); // nakarmiony wróg liczy się mocniej
       if (z > 0) up += z * e.w; else down += z * e.w;
       vsList.push({ id: e.id, p0, pE, z });
@@ -780,7 +786,20 @@ function analyze(me, base, meta, vs, enemies, long) {
     return rows.filter(r => r.t >= min && r.t < ph.max && r.p >= .12).sort((a, b) => b.p - a.p).slice(0, ph.take)
       .sort((a, b) => a.t - b.t);
   });
-  const counters = rows.filter(r => r.up > 0 && r.p >= .05).sort((a, b) => b.up - a.up).slice(0, 8);
+  // Kontry mechaniczne: przedmiot, który wprost odbiera bohaterowi jego mocną stronę.
+  for (const [itemName, list] of Object.entries(HARD_COUNTERS)) {
+    const r = rows.find(x => x.it.name === itemName);
+    if (!r) continue;
+    for (const e of en) {
+      const why = list[heroById(e.id)?.name];
+      if (!why) continue;
+      r.hard = (r.hard ? r.hard + ' ' : '') + why;
+      r.up = Math.max(r.up, 0) + 6 * e.w;
+      if (!r.vsList.some(v => v.id === e.id)) r.vsList.unshift({ id: e.id, p0: r.p0, pE: r.p0, z: 6 });
+    }
+  }
+  const isTargeted = r => r.vsList.some(v => v.z >= 3 && v.pE >= .02 && v.pE / Math.max(v.p0, .001) >= 1.8);
+  const counters = rows.filter(r => r.up > 0 && (r.p >= .05 || r.hard || isTargeted(r))).sort((a, b) => b.up - a.up).slice(0, 8);
   const avoid = rows.filter(r => r.down < 0 && r.up === 0 && r.p0 >= .12).sort((a, b) => a.down - b.down).slice(0, 4);
   return { G, wr0, en, phases, counters, avoid, rows };
 }
@@ -1202,9 +1221,13 @@ function reason(r) {
   const parts = [];
   const why = WHY[normName(r.it.name)];
   if (why) parts.push(why);
-  const vs = r.vsList.filter(v => v.z > 0).slice(0, 2).map(v => `${heroById(v.id)?.name} (${pct(v.pE)}, usually ${pct(v.p0)})`);
+  if (r.hard) parts.push(r.hard);
+  const vs = r.vsList.filter(v => v.z > 0 && v.pE > v.p0).slice(0, 2).map(v => {
+    const x = v.pE / Math.max(v.p0, .001);
+    return `${heroById(v.id)?.name} (${x >= 1.8 ? x.toFixed(1) + '× as often, ' : ''}${pct(v.pE)}, usually ${pct(v.p0)})`;
+  });
   if (vs.length) parts.push('Bought more often against ' + vs.join(' and ') + '.');
-  else parts.push(`Bought in ${pct(r.p)} of ${r.late ? 'long games' : 'games'}${r.p >= .6 ? ' — a core item' : ''}.`);
+  else if (!r.hard) parts.push(`Bought in ${pct(r.p)} of ${r.late ? 'long games' : 'games'}${r.p >= .6 ? ' — a core item' : ''}.`);
   if (effCost(r.it) < (r.it.cost || 0)) parts.push(`Costs ${num(effCost(r.it))} instead of ${num(r.it.cost)} because you own a component.`);
   return parts.join(' ').slice(0, 230);
 }
