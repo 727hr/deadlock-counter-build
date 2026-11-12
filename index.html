@@ -1511,6 +1511,7 @@ function applyOverlay() {
     }
   }
   live.lane = new Set(list('lane'));
+  if (/^-?\d+(\.\d+)?,-?\d+(\.\d+)?,\d+(\.\d+)?$/.test(params.get('ui') || '')) store.set('dl-ui', params.get('ui'));
   lastList = ''; // po każdej zmianie stanu lista idzie do moda od nowa (mod sam pomija powtórki)
   const acc = (params.get('acc') || '').replace(/[^0-9]/g, '');
   if (acc !== live.acc) { live.acc = acc; live.pool = null; live.poolLoading = false; }
@@ -1554,6 +1555,9 @@ window.__cbUpdate = async q => {
     if (!OVERLAY) live.acc = (new URLSearchParams(location.search).get('acc') || '').replace(/[^0-9]/g, '');
     if (OVERLAY) {
       document.body.classList.add('overlay');
+      // Zapisane położenie listy wraca do moda, zanim strona przyśle listę zakupów.
+      const savedUi = store.get('dl-ui');
+      if (savedUi && !/[?&#]ui=/.test(location.href)) { document.title = 'CB|ui|' + savedUi; await new Promise(r => setTimeout(r, 400)); }
       try { await loadLocale(await overlayLang()); } catch (e) {}
       applyOverlay();
     } else {
