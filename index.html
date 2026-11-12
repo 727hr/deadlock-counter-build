@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Deadlock Counter-Build</title>
+<title>Deadlock Builder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=Marcellus+SC&display=swap" rel="stylesheet">
@@ -308,6 +308,32 @@
   .psearch .search { margin: 0; max-width: 360px; }
   .psearch .vs { padding: 6px 14px; cursor: pointer; }
 
+  /* ---------- odświeżony wygląd ---------- */
+  body { background: radial-gradient(1100px 520px at 80% -12%, #20332d 0%, transparent 62%), radial-gradient(900px 480px at -5% 0%, #2a2014 0%, transparent 58%), linear-gradient(180deg, #0c1211 0%, #090d0c 100%); background-attachment: fixed; }
+  header { padding-top: 26px; padding-bottom: 14px; }
+  .brand .mark { width: 34px; height: 34px; border-radius: 6px; box-shadow: 0 0 18px -4px var(--gold); }
+  h1 { font-size: 30px; }
+  .panel { border-color: #24332f; border-radius: 16px; box-shadow: 0 18px 40px -24px #000, inset 0 1px 0 rgba(255,255,255,.03); }
+  .nav { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+  .nav a.on { background: var(--panel3); box-shadow: none; }
+  .label { font-size: 12px; letter-spacing: 2.4px; }
+  .banner { border-radius: 16px 16px 0 0; }
+  .banner .card { border-radius: 10px; border-color: rgba(232,185,100,.45); }
+  .stat { border-radius: 999px; padding: 4px 12px; }
+  .phase { border-radius: 14px; border-color: #24332f; background: linear-gradient(180deg, var(--panel2), #151e1c); }
+  .phase-head { background: none; }
+  .tile { border-radius: 11px; box-shadow: 0 8px 18px -10px #000, inset 0 0 0 1px rgba(255,255,255,.08); }
+  .tile .art { border-radius: 11px 11px 0 0; }
+  .tile .foot { border-radius: 0 0 11px 11px; }
+  .tile:hover { transform: translateY(-3px) scale(1.02); }
+  .vs, .ccard, .part, .chk, .core, .hrow, .obj { border-color: #24332f; }
+  .vs { border-radius: 12px; }
+  .ccard { border-radius: 14px; }
+  .hero { border-radius: 10px; }
+  .slot { border-radius: 12px; }
+  .search { border-radius: 10px; }
+  footer { opacity: .8; }
+
   footer { max-width: 1440px; margin: 0 auto; padding: 0 24px 30px; color: var(--muted); font-size: 12px; }
   footer a { color: var(--muted); }
 </style>
@@ -317,7 +343,7 @@
   <div class="brand">
     <div class="mark"><i></i></div>
     <div>
-      <h1>Deadlock <em>Counter-Build</em></h1>
+      <h1>Deadlock <em>Builder</em></h1>
       <p>Pick your hero and the enemy team to see what top players buy in that matchup.</p>
     </div>
   </div>
@@ -506,19 +532,25 @@ async function refresh() {
     if (entry.starting) return;
     entry.starting = true;
     try {
-      // Okno danych: możliwie świeże. Najpierw ostatnie 14 dni (albo od patcha, jeśli jest nowszy),
-      // a gdy gier bohatera jest za mało — 14 dni, potem 30 dni (0 = domyślne 30 dni API).
+      // Okno danych: świeżość ważniejsza niż ranga. Najpierw 7 dni (albo od patcha, jeśli nowszy), schodząc
+      // z rangą w dół; dopiero gdy nigdzie nie ma dość gier — 14 dni, potem 30 (0 = domyślne 30 dni API).
       const patch = await loadPatch();
-      const d14 = Math.floor(Date.now() / 86400e3) * 86400 - 14 * 86400;
-      let since, meta;
-      for (since of [...new Set([Math.max(patch, d14), d14, 0])]) {
-        meta = await loadMeta(badge, since);
-        if ((meta.games.get(me)?.m || 0) >= MIN_GAMES) break;
+      const day = Math.floor(Date.now() / 86400e3) * 86400, d7 = day - 7 * 86400, d14 = day - 14 * 86400;
+      const ladder = ['110', '100', '80', ''], ranks = ladder.slice(Math.max(0, ladder.indexOf(badge)));
+      let since, meta, use = badge, ok = false;
+      for (since of [...new Set([Math.max(patch, d7), d14, 0])]) {
+        for (use of ranks) {
+          meta = await loadMeta(use, since);
+          if ((meta.games.get(me)?.m || 0) >= MIN_GAMES) { ok = true; break; }
+        }
+        if (ok) break;
       }
-      entry.patch = patch; entry.since = since; entry.meta = meta;
+      if (!ok) { use = badge; since = 0; meta = await loadMeta(badge, 0); }
+      entry.patch = patch; entry.since = since; entry.meta = meta; entry.useBadge = use;
     } catch (e) { return fail(e); }
   }
-  const q = `hero_ids=${me}&min_matches=1` + (badge ? `&min_average_badge=${badge}` : '') +
+  const ub = entry.useBadge;
+  const q = `hero_ids=${me}&min_matches=1` + (ub ? `&min_average_badge=${ub}` : '') +
     (entry.since ? `&min_unix_timestamp=${entry.since}` : '');
   if (!entry.base && !entry.baseLoading) {
     entry.baseLoading = true;
@@ -527,7 +559,7 @@ async function refresh() {
   if (!entry.long && !entry.longLoading) {
     // Późne itemy liczymy tylko z długich gier — w krótkich nikt nie zdąży ich kupić.
     entry.longLoading = true;
-    const hq = (badge ? `&min_average_badge=${badge}` : '') + (entry.since ? `&min_unix_timestamp=${entry.since}` : '');
+    const hq = (ub ? `&min_average_badge=${ub}` : '') + (entry.since ? `&min_unix_timestamp=${entry.since}` : '');
     Promise.all([
       queued(`${API}/analytics/item-stats?${q}&min_duration_s=${LONG_GAME_S}`),
       queued(`${API}/analytics/hero-stats?min_duration_s=${LONG_GAME_S}${hq}`),
@@ -538,7 +570,7 @@ async function refresh() {
   }
   if (!entry.abil && !entry.abilLoading) {
     entry.abilLoading = true;
-    queued(`${API}/analytics/ability-order-stats?hero_id=${me}&min_matches=5` + (badge ? `&min_average_badge=${badge}` : '') +
+    queued(`${API}/analytics/ability-order-stats?hero_id=${me}&min_matches=5` + (ub ? `&min_average_badge=${ub}` : '') +
       (entry.since ? `&min_unix_timestamp=${entry.since}` : '')).then(d => { entry.abil = d; done(); }).catch(() => {});
   }
   if (live.acc && !live.pool && !live.poolLoading) {
@@ -1164,16 +1196,17 @@ function renderResult(entry) {
     (me.card ? `<img class="card" src="${esc(me.card)}" alt="">` : '') +
     `<div><div class="kicker">Build for this match</div><h2>${esc(me.name)}</h2><div class="stats">` +
     `<span class="stat"><b>${num(a.G)}</b>games</span>` +
-    `<span class="stat"><b>${RANK_LABELS[entry.badge]}</b>rank</span>` +
+    `<span class="stat"><b>${RANK_LABELS[entry.useBadge ?? entry.badge]}</b>rank</span>` +
     `<span class="stat"><b>${(a.wr0 * 100).toFixed(1)}%</b>win rate</span>` +
-    `<span class="stat"><b>${fromPatch ? 'since ' + day(entry.since) : entry.since ? '14 days' : '30 days'}</b>${fromPatch ? 'current patch' : 'latest matches'}</span>` +
+    `<span class="stat"><b>${fromPatch ? 'since ' + day(entry.since) : entry.since ? Math.round((Date.now() / 1000 - entry.since) / 86400) + ' days' : '30 days'}</b>${fromPatch ? 'current patch' : 'latest matches'}</span>` +
     '</div></div></div>';
 
   const pending = enemies.filter(id => entry.vs.get(id)?.loading).length;
   const failed = enemies.filter(id => entry.vs.get(id)?.err);
   if (pending) html += `<p class="note"><span class="spinner"></span>Loading enemy data (${enemies.length - pending - failed.length}/${enemies.length})…</p>`;
   if (failed.length) html += `<p class="note err">No data for: ${failed.map(id => esc(heroById(id)?.name ?? id)).join(', ')} (${esc(entry.vs.get(failed[0]).err)}). Click the hero again to retry.</p>`;
-  if (!entry.since) html += '<p class="note warn">Too few games for this hero at this rank in the last 14 days, so the data covers 30 days.</p>';
+  if (entry.useBadge !== undefined && entry.useBadge !== entry.badge) html += `<p class="note warn">Not enough recent ${RANK_LABELS[entry.badge]} games for this hero, so this build uses ${RANK_LABELS[entry.useBadge]} matches from the last ${entry.since ? Math.round((Date.now() / 1000 - entry.since) / 86400) + ' days' : '30 days'} to stay up to date.</p>`;
+  else if (!entry.since) html += '<p class="note warn">Too few recent games for this hero at this rank, so the data covers 30 days.</p>';
   if (a.G < 500) html += '<p class="note warn">Small sample of games — consider a wider rank range at the top of the page.</p>';
   if (!enemies.length) html += '<p class="note">This is the general build. Add enemies on the left to tailor it to the match.</p>';
 
