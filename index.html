@@ -1572,16 +1572,23 @@ function applyOverlay() {
   enemyNames.forEach((n, i) => { const id = find(n), s = parseSouls(enemySouls[i]); if (id && s) live.souls.set(id, s); });
   live.owned = params.has('own') ? new Set(params.get('own').split('|').filter(Boolean).map(toEn)) : null;
   live.ownedRaw = params.has('inv') ? new Set(params.get('inv').split('|').filter(Boolean).map(toEn)) : live.owned ? new Set(live.owned) : null;
-  // "Kupione w meczu" droższe niż wszystkie moje dusze = to zakupy z poprzedniej gry (sklep pokazuje je chwilę po starcie).
-  // Wtedy ufamy tylko obecnemu ekwipunkowi (i składnikom tego, co mam).
+  // Sklep potrafi na początku meczu pokazywać itemy z poprzedniej gry. Itemy warte dużo więcej, niż mogłem mieć dusz,
+  // nie są moje: "kupione w meczu" zastępujemy wtedy obecnym ekwipunkiem, a gdy i on jest za drogi — nie wiemy nic.
+  // Moje dusze przysyła mod 3.3+; dla starszych szacujemy z najbogatszego wroga, z dużym zapasem.
   const mySouls = parseSouls(params.get('ms') || '');
-  if (mySouls && live.owned && live.ownedRaw) {
-    const costOf = n => [...items.values()].find(it => normName(it.name) === n)?.cost || 0;
-    const spent = [...live.owned].reduce((s, n) => s + costOf(n), 0);
-    if (spent > mySouls + 1500) {
-      const keep = new Set(live.ownedRaw);
-      const byCls = new Map([...items.values()].map(it => [it.cls, it]));
-      for (const it of items.values()) if (live.ownedRaw.has(normName(it.name))) for (const c of it.comps || []) { const ci = byCls.get(c); if (ci) keep.add(normName(ci.name)); }
+  const soulsKnown = params.has('ms') || enemySouls.some(s => s !== '');
+  const enemyMax = Math.max(0, ...enemySouls.map(parseSouls));
+  const limit = !soulsKnown ? Infinity : mySouls ? mySouls * 1.4 + 2000 : enemyMax * 2 + 3000;
+  if (live.owned && limit < Infinity) {
+    const byCls = new Map([...items.values()].map(it => [it.cls, it]));
+    const byName = new Map([...items.values()].map(it => [normName(it.name), it]));
+    const compsOf = n => (byName.get(n)?.comps || []).map(c => byCls.get(c)).filter(Boolean).map(ci => normName(ci.name));
+    // Składnik ulepszenia, które też jest na liście, nie kosztuje osobno (gra dalej oznacza go jako posiadany).
+    const costTop = set => { const inside = new Set([...set].flatMap(compsOf)); let s = 0; for (const n of set) if (!inside.has(n)) s += byName.get(n)?.cost || 0; return s; };
+    if (live.ownedRaw && costTop(live.ownedRaw) > limit) { live.owned = null; live.ownedRaw = null; }
+    else if (costTop(live.owned) > limit) {
+      const keep = new Set(live.ownedRaw || []);
+      for (const n of live.ownedRaw || []) for (const c of compsOf(n)) keep.add(c);
       live.owned = keep;
     }
   }
