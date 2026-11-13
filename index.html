@@ -1619,7 +1619,8 @@ function applyOverlay() {
     }
   }
   live.lane = new Set(list('lane'));
-  if (/^-?\d+(\.\d+)?(,-?\d+(\.\d+)?){2}((,-?\d+(\.\d+)?){4})?$/.test(params.get('ui') || '')) store.set('dl-ui', params.get('ui'));
+  // Ustawienia moda: lista "x,y,skala", okno ",x,y,szer,wys", flagi ",f" (1 = okno schowane pod Tabem, 2 = w sklepie).
+  if (/^-?\d+(\.\d+)?(,-?\d+(\.\d+)?){2}((,-?\d+(\.\d+)?){4}(,\d+)?)?$/.test(params.get('ui') || '')) store.set('dl-ui', params.get('ui'));
   lastList = ''; // po każdej zmianie stanu lista idzie do moda od nowa (mod sam pomija powtórki)
   const acc = (params.get('acc') || '').replace(/[^0-9]/g, '');
   if (acc !== live.acc) { live.acc = acc; live.pool = null; live.poolLoading = false; }
